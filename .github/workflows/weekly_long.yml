@@ -1,0 +1,30 @@
+name: Weekly Long Video Publisher (4K)
+
+on:
+  schedule:
+    - cron: '0 15 * * 5'  # كل يوم جمعة
+  workflow_dispatch:      # تشغيل يدوي للتجربة
+
+jobs:
+  publish_long:
+    runs-on: ubuntu-latest
+    steps:
+      - name: فحص المستودع
+        uses: actions/checkout@v4
+
+      - name: إعداد بيئة بايثون
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: تثبيت المكتبات
+        run: pip install -r requirements.txt
+
+      - name: تشغيل نشر الفيديو الطويل
+        env:
+          BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          BUFFER_CHANNEL_ABAAD: ${{ secrets.BUFFER_CHANNEL_ABAAD }}
+          BUFFER_CHANNEL_MEGABUILDS: ${{ secrets.BUFFER_CHANNEL_MEGABUILDS }}
+          BUFFER_CHANNEL_MASAR: ${{ secrets.BUFFER_CHANNEL_MASAR }}
+        run: python main_publisher.py long
