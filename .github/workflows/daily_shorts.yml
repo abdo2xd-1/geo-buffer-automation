@@ -1,40 +1,37 @@
-name: Daily Shorts Publisher (AI Video & 4K)
+name: Daily Shorts Publisher (2 Shorts Daily)
 
 on:
   schedule:
-    # يعمل تلقائياً كل يوم الساعة 2:00 ظهراً بتوقيت UTC (4:00 عصراً بتوقيت مصر)
-    - cron: '0 14 * * *'
-  workflow_dispatch: # يتيح لك زر "Run workflow" لتشغيله يدوياً في أي وقت
+    # يعمل مرتين يومياً: الساعة 11:00 صباحاً و 5:00 مساءً بتوقيت UTC
+    # (أي 1:00 ظهراً و 7:00 مساءً بتوقيت مصر)
+    - cron: '0 11,17 * * *'
+  workflow_dispatch: # للتشغيل اليدوي في أي وقت
 
 jobs:
   publish_shorts:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-      # 1. سحب الكود من المستودع
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. إعداد بيئة بايثون
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           cache: 'pip'
 
-      # 3. تثبيت حزم النظام الضرورية (ffmpeg للمونتاج وخطوط النصوص العربية)
       - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core
 
-      # 4. تثبيت مكتبات بايثون
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 5. تشغيل السكربت لتوليد الفيديو وجدولته على Buffer
       - name: Run Shorts Publisher
         env:
           BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
