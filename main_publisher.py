@@ -3,7 +3,7 @@ import sys
 import random
 import requests
 
-# 1. جلب المفاتيح من متغيرات البيئة
+# 1. جلب المفاتيح من أسرار GitHub
 BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 
@@ -43,7 +43,7 @@ CHANNEL_TEMPLATES = [
     }
 ]
 
-# روابط فيديوهات 4K احتياطية صالحة ومباشرة
+# روابط فيديوهات 4K احتياطية
 FALLBACK_4K_LANDSCAPE = [
     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
@@ -54,7 +54,7 @@ FALLBACK_4K_PORTRAIT = [
 ]
 
 def get_video_url(query, orientation="landscape"):
-    """جلب الفيديو من Pexels أو استخدام الرابط المباشر الاحتياطي"""
+    """جلب الفيديو من Pexels أو استخدام الرابط الاحتياطي"""
     if len(CLEAN_PEXELS_KEY) >= 50:
         url = f"https://api.pexels.com/videos/search?query={query}&orientation={orientation}&per_page=15"
         headers = {"Authorization": CLEAN_PEXELS_KEY}
@@ -79,8 +79,8 @@ def get_video_url(query, orientation="landscape"):
     print("ℹ️ جاري استخدام رابط فيديو عالي الدقة احتياطي...")
     return random.choice(FALLBACK_4K_PORTRAIT if orientation == "portrait" else FALLBACK_4K_LANDSCAPE)
 
-def publish_to_buffer_graphql(channel_id, text, video_url):
-    """الجدولة عبر Buffer GraphQL API وفق المخطط الرسمي المحدث"""
+def publish_to_buffer_graphql(channel_id, video_title, description_text, video_url):
+    """الجدولة عبر Buffer مع إرسال بيانات يوتيوب الإلزامية (Title & Category)"""
     url = "https://api.buffer.com"
     headers = {
         "Authorization": f"Bearer {BUFFER_TOKEN}",
@@ -103,11 +103,10 @@ def publish_to_buffer_graphql(channel_id, text, video_url):
     }
     """
 
-    # الهيكل الصحيح تماماً لحقل الفيديو في Buffer
     variables = {
         "input": {
             "channelId": channel_id,
-            "text": text,
+            "text": description_text,  # وصف الفيديو على يوتيوب
             "schedulingType": "automatic",
             "mode": "addToQueue",
             "assets": [
@@ -116,7 +115,15 @@ def publish_to_buffer_graphql(channel_id, text, video_url):
                         "url": video_url
                     }
                 }
-            ]
+            ],
+            # البيانات المطلوبة خصيصاً لقنوات YouTube
+            "metadata": {
+                "youtube": {
+                    "title": video_title[:95],  # عنوان الفيديو (بحد أقصى 95 حرف)
+                    "categoryId": "27",          # تصنيف التعليم والثقافة
+                    "madeForKids": False
+                }
+            }
         }
     }
 
@@ -149,11 +156,13 @@ def run_job(job_type):
         video_url = get_video_url(keyword, orientation=orientation)
         
         if is_short:
-            title = f"شاهد روعة المشهد وتفاصيل مذهلة بتقنية 4K ⚡\n\n{template['hashtags']} #Shorts #4K"
+            video_title = f"{template['name']} | لقطات مذهلة بدقة 4K"
+            description = f"شاهد روعة التفاصيل بدقة فائقة 4K ⚡\n\n{template['hashtags']} #Shorts #4K"
         else:
-            title = f"وثائقي حصري بدقة 4K فائقة: تفاصيل وأسرار حصرية 🌍🎬\n\n{template['hashtags']}"
+            video_title = f"وثائقي حصري: {template['name']} وأسرار المستقبل بدقة 4K"
+            description = f"وثائقي حصري بجودة فائقة 4K: تحليل شامل وأسرار حصرية 🌍🎬\n\n{template['hashtags']}"
             
-        publish_to_buffer_graphql(channel_id, title, video_url)
+        publish_to_buffer_graphql(channel_id, video_title, description, video_url)
 
 if __name__ == "__main__":
     target = sys.argv[1] if len(sys.argv) > 1 else "short"
