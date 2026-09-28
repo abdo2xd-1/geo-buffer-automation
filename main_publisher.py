@@ -30,7 +30,7 @@ DEFAULT_CHANNELS = [
 env_channel_str = os.getenv("BUFFER_CHANNEL_IDS", "").strip()
 CHANNELS_LIST = [ch.strip() for ch in env_channel_str.replace("\n", ",").split(",") if ch.strip()] if env_channel_str else DEFAULT_CHANNELS
 
-# 2. بنك المعلومات والمشاهد
+# 2. بنك المعلومات والمشاهد بدقة 1080x1920
 FACTS_DATABASE = [
     {
         "country": "بريطانيا",
@@ -180,59 +180,66 @@ def create_complete_video():
     return output_filename
 
 def upload_to_temp_host(file_path):
-    """رفع الفيديو إلى سيرفر وسائط مباشر متوافق 100% مع Buffer"""
+    """رفع الفيديو عبر خوادم موثوقة ومفتوحة تقبل GitHub Actions وسيرفرات Buffer"""
     print("☁️ جاري رفع الفيديو وتجهيز الرابط المباشر لـ Buffer...")
 
-    # 1. Catbox (رابط مباشر ثابت وسريع بدون Cloudflare)
+    # 1. الخادم الأول: 0x0.st (خفيف جداً ومباشر بدون Cloudflare)
     try:
-        print("🔄 محاولة الرفع عبر Catbox...")
+        print("🔄 محاولة الرفع عبر 0x0.st...")
         with open(file_path, "rb") as f:
             resp = requests.post(
-                "https://catbox.moe/user/api.php",
-                data={"reqtype": "fileupload"},
-                files={"fileToUpload": (os.path.basename(file_path), f, "video/mp4")},
-                timeout=120
+                "https://0x0.st",
+                files={"file": (os.path.basename(file_path), f, "video/mp4")},
+                headers={"User-Agent": "curl/8.0.0"},
+                timeout=90
             )
             if resp.status_code == 200 and resp.text.strip().startswith("http"):
                 url = resp.text.strip()
-                print(f"🔗 تم الرفع بنجاح عبر Catbox: {url}")
+                print(f"🔗 تم الرفع بنجاح عبر 0x0.st: {url}")
                 return url
+            print(f"⚠️ استجابة 0x0.st: {resp.status_code} - {resp.text[:100]}")
     except Exception as e:
-        print(f"⚠️ خطأ Catbox: {e}")
+        print(f"⚠️ تعذر 0x0.st: {e}")
 
-    # 2. Litterbox (خادم احتياطي مؤقت 24 ساعة)
+    # 2. الخادم الثاني: uguu.se (سريع ومخصص للوسائط المؤقتة المباشرة)
     try:
-        print("🔄 محاولة الرفع عبر Litterbox...")
+        print("🔄 محاولة الرفع عبر uguu.se...")
         with open(file_path, "rb") as f:
             resp = requests.post(
-                "https://litterbox.catbox.moe/resources/internals/api.php",
-                data={"reqtype": "fileupload", "time": "24h"},
-                files={"fileToUpload": (os.path.basename(file_path), f, "video/mp4")},
-                timeout=120
+                "https://uguu.se/upload",
+                files={"files[]": (os.path.basename(file_path), f, "video/mp4")},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=90
             )
-            if resp.status_code == 200 and resp.text.strip().startswith("http"):
-                url = resp.text.strip()
-                print(f"🔗 تم الرفع بنجاح عبر Litterbox: {url}")
-                return url
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("success") and data.get("files"):
+                    url = data["files"][0]["url"]
+                    print(f"🔗 تم الرفع بنجاح عبر Uguu: {url}")
+                    return url
+            print(f"⚠️ استجابة uguu: {resp.status_code}")
     except Exception as e:
-        print(f"⚠️ خطأ Litterbox: {e}")
+        print(f"⚠️ تعذر uguu: {e}")
 
-    # 3. Transfer.sh (بديل ثالث مباشر)
+    # 3. الخادم الثالث: pixeldrain.com (خادم عالمي سريع ويدعم التنزيل المباشر)
     try:
-        print("🔄 محاولة الرفع عبر Transfer.sh...")
+        print("🔄 محاولة الرفع عبر pixeldrain.com...")
         with open(file_path, "rb") as f:
-            resp = requests.put(
-                f"https://transfer.sh/{os.path.basename(file_path)}",
-                data=f,
-                headers={"Content-Type": "video/mp4"},
-                timeout=120
+            resp = requests.post(
+                f"https://pixeldrain.com/api/file/{os.path.basename(file_path)}",
+                files={"file": f},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=90
             )
-            if resp.status_code in [200, 201] and resp.text.strip().startswith("http"):
-                url = resp.text.strip()
-                print(f"🔗 تم الرفع بنجاح عبر Transfer.sh: {url}")
-                return url
+            if resp.status_code in [200, 201]:
+                file_id = resp.json().get("id")
+                if file_id:
+                    url = f"https://pixeldrain.com/api/file/{file_id}"
+                    print(f"🔗 تم الرفع بنجاح عبر Pixeldrain: {url}")
+                    return url
+            print(f"⚠️ استجابة pixeldrain: {resp.status_code}")
     except Exception as e:
-        print(f"⚠️ خطأ Transfer.sh: {e}")
+        print(f"⚠️ تعذر pixeldrain: {e}")
 
     raise Exception("فشلت جميع خوادم الرفع المباشر.")
 
