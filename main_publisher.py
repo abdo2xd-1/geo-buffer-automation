@@ -5,7 +5,7 @@ import asyncio
 import io
 import requests
 
-# ترقيع توافق moviepy مع Pillow
+# ترقيع توافق moviepy مع إصدارات Pillow الحديثة
 import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
@@ -30,7 +30,7 @@ DEFAULT_CHANNELS = [
 env_channel_str = os.getenv("BUFFER_CHANNEL_IDS", "").strip()
 CHANNELS_LIST = [ch.strip() for ch in env_channel_str.replace("\n", ",").split(",") if ch.strip()] if env_channel_str else DEFAULT_CHANNELS
 
-# 2. بنك المعلومات والمشاهد بروابط CDN مباشرة ومستقرة بمقاس 1080x1920
+# 2. بنك المعلومات والمشاهد
 FACTS_DATABASE = [
     {
         "country": "بريطانيا",
@@ -113,19 +113,17 @@ async def generate_speech(text, output_file):
     await communicate.save(output_file)
 
 def get_scene_image(image_url, country_name, index):
-    """تحميل الصورة بأمان تام مع نظام استرجاع تلقائي يمنع أي انهيار"""
+    """تحميل الصورة بأمان تام مع نظام استرجاع تلقائي"""
     raw_path = f"img_{index}.jpg"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     try:
         resp = requests.get(image_url, headers=headers, timeout=20)
         if resp.status_code == 200 and len(resp.content) > 3000:
-            # التحقق من أن الملف صورة صالحة فعلياً
             test_img = Image.open(io.BytesIO(resp.content))
             test_img.verify()
             
-            # إعادة الفتح للمعالجة والتحويل
             im = Image.open(io.BytesIO(resp.content)).convert("RGB")
             im = im.resize((1080, 1920), Image.Resampling.LANCZOS)
             im.save(raw_path, "JPEG", quality=90)
@@ -133,7 +131,6 @@ def get_scene_image(image_url, country_name, index):
     except Exception as e:
         print(f"⚠️ تنبيه: تعذر جلب صورة {country_name} ({e})، سيتم توليد خلفية بديلة.")
 
-    # خلفية سينمائية أنيقة متدرجة كبديل مباشر
     fallback_img = Image.new("RGB", (1080, 1920), color=(15, 23, 42))
     draw = ImageDraw.Draw(fallback_img)
     draw.rectangle([40, 40, 1040, 1880], outline=(56, 189, 248), width=8)
@@ -144,22 +141,18 @@ def build_scene(scene_data, index):
     """بناء مشهد الشورتس مع الصوت وحركة التكبير والنصوص"""
     print(f"🎬 جاري معالجة المشهد ({index + 1}): {scene_data['country']}")
     
-    # 1. توليد الصوت
     audio_path = f"audio_{index}.mp3"
     asyncio.run(generate_speech(scene_data["fact"], audio_path))
     audio_clip = AudioFileClip(audio_path)
     duration = audio_clip.duration + 0.3
     
-    # 2. تجهيز الصورة الآمنة
     img_path = get_scene_image(scene_data["image_url"], scene_data["country"], index)
     
-    # 3. حركة التكبير التدريجي (Zoom Effect)
     img_clip = (ImageClip(img_path)
                 .set_duration(duration)
                 .resize(lambda t: 1 + 0.04 * t)
                 .crop(x_center=540, y_center=960, width=1080, height=1920))
     
-    # 4. النص العربي
     caption_path = create_caption_image(scene_data["fact"])
     caption_clip = ImageClip(caption_path).set_duration(duration)
     
@@ -187,21 +180,53 @@ def create_complete_video():
     return output_filename
 
 def upload_to_temp_host(file_path):
-    """رفع الفيديو مؤقتاً للحصول على رابط MP4 مباشر لمنصة Buffer"""
+    """رفع الفيديو مع محاولات متتالية عبر خوادم متعددة لضمان الحصول على رابط مباشر"""
     print("☁️ جاري رفع الفيديو وتجهيز الرابط لـ Buffer...")
-    url = "https://litterbox.catbox.moe/resources/internals/api.php"
-    with open(file_path, "rb") as f:
-        files = {
-            "reqtype": (None, "fileupload"),
-            "time": (None, "12h"),
-            "fileToUpload": (file_path, f, "video/mp4")
-        }
-        res = requests.post(url, files=files, timeout=60)
-        if res.status_code == 200 and res.text.startswith("http"):
-            direct_url = res.text.strip()
-            print(f"🔗 رابط الفيديو المباشر: {direct_url}")
-            return direct_url
-    raise Exception("فشل رفع ملف الفيديو إلى خادم الوسائط المؤقت.")
+
+    # 1. الخيار الأول: tmpfiles.org
+    try:
+        print("🔄 محاولة الرفع عبر tmpfiles.org...")
+        with open(file_path, "rb") as f:
+            resp = requests.post("https://tmpfiles.org/api/v1/upload", files={"file": f}, timeout=60)
+            if resp.status_code == 200:
+                raw_url = resp.json().get("data", {}).get("url", "")
+                if raw_url:
+                    direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+                    print(f"🔗 تم بنجاح! رابط الفيديو: {direct_url}")
+                    return direct_url
+    except Exception as e:
+        print(f"⚠️ فشل الرفع عبر tmpfiles ({e})، جاري التبديل للخادم البديل...")
+
+    # 2. الخيار الثاني: 0x0.st
+    try:
+        print("🔄 محاولة الرفع عبر 0x0.st...")
+        with open(file_path, "rb") as f:
+            resp = requests.post("https://0x0.st", files={"file": f}, timeout=60)
+            if resp.status_code == 200 and resp.text.strip().startswith("http"):
+                direct_url = resp.text.strip()
+                print(f"🔗 تم بنجاح! رابط الفيديو: {direct_url}")
+                return direct_url
+    except Exception as e:
+        print(f"⚠️ فشل الرفع عبر 0x0.st ({e})، جاري تجربة خادم آخر...")
+
+    # 3. الخيار الثالث: litterbox
+    try:
+        print("🔄 محاولة الرفع عبر litterbox...")
+        with open(file_path, "rb") as f:
+            files = {
+                "reqtype": (None, "fileupload"),
+                "time": (None, "12h"),
+                "fileToUpload": (file_path, f, "video/mp4")
+            }
+            resp = requests.post("https://litterbox.catbox.moe/resources/internals/api.php", files=files, timeout=60)
+            if resp.status_code == 200 and resp.text.strip().startswith("http"):
+                direct_url = resp.text.strip()
+                print(f"🔗 تم بنجاح! رابط الفيديو: {direct_url}")
+                return direct_url
+    except Exception as e:
+        print(f"⚠️ فشل الرفع عبر litterbox ({e})")
+
+    raise Exception("تعذر رفع الفيديو إلى جميع الخوادم البديلة.")
 
 def publish_to_buffer(channel_id, title, video_url):
     """جدولة الفيديو على منصة Buffer عبر GraphQL API"""
