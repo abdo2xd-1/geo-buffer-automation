@@ -1,95 +1,185 @@
 import os
 import sys
 import random
+import asyncio
 import re
 import requests
+from PIL import Image, ImageDraw, ImageFont
+import arabic_reshaper
+from bidi.algorithm import get_display
+from moviepy.editor import (
+    ImageClip,
+    AudioFileClip,
+    CompositeVideoClip,
+    concatenate_videoclips
+)
 
-# 1. جلب المفاتيح وتطهير مفتاح Pexels تماماً من أي مسافات داخلية أو حروف غير مدعومة
+# 1. إعدادات المفاتيح
 BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
-RAW_PEXELS_KEY = os.getenv("PEXELS_API_KEY", "")
-
-# إزالة أي مسافات أو رموز والاحتفاظ فقط بالأحرف والأرقام الإنجليزية
-CLEAN_PEXELS_KEY = re.sub(r'[^a-zA-Z0-9]', '', RAW_PEXELS_KEY).strip()
-
-print(f"🔑 Pexels Key Length: {len(CLEAN_PEXELS_KEY)}")
-if len(CLEAN_PEXELS_KEY) > 8:
-    print(f"🔑 Key Preview: {CLEAN_PEXELS_KEY[:4]}...{CLEAN_PEXELS_KEY[-4:]}")
-
-# 2. معرفات القنوات
 DEFAULT_CHANNELS = [
     "6abacd06ea19ca0bde180ef9",
     "6abace11ea19ca0bde181821",
     "6abace7bea19ca0bde181dff"
 ]
-
 env_channel_str = os.getenv("BUFFER_CHANNEL_IDS", "").strip()
-if env_channel_str:
-    channels_list = [ch.strip() for ch in env_channel_str.replace("\n", ",").split(",") if ch.strip()]
-else:
-    channels_list = DEFAULT_CHANNELS
+CHANNELS_LIST = [ch.strip() for ch in env_channel_str.replace("\n", ",").split(",") if ch.strip()] if env_channel_str else DEFAULT_CHANNELS
 
-# قوالب القنوات
-CHANNEL_TEMPLATES = [
+# 2. بنك المعلومات والخرائط ثلاثية الأبعاد (3D Maps Assets)
+FACTS_DATABASE = [
     {
-        "name": "أبعاد جغرافية",
-        "keywords": ["desert landscape aerial", "canyon mountains nature", "river delta satellite"],
-        "hashtags": "#أبعاد_جغرافية #جغرافيا #وثائقي #طبيعة #استكشاف"
+        "country": "بريطانيا",
+        "fact": "هل تعلم أن بريطانيا هي الدولة الوحيدة التي لم تُستعمر في التاريخ الحديث؟",
+        "image_url": "https://images.pexels.com/photos/460672/pexels-photo-460672.jpeg"
     },
     {
-        "name": "مشاريع عملاقة",
-        "keywords": ["mega construction engineering", "massive bridge architecture", "heavy machinery dam"],
-        "hashtags": "#مشاريع_عملاقة #هندسة #بناء #تطوير #مستقبل"
+        "country": "ألمانيا",
+        "fact": "بينما تمتلك ألمانيا أقوى وأضخم اقتصاد صناعي في قارة أوروبا بأكملها.",
+        "image_url": "https://images.pexels.com/photos/109629/pexels-photo-109629.jpeg"
     },
     {
-        "name": "مسار",
-        "keywords": ["cargo shipping container port", "modern city highway aerial", "solar energy power farm"],
-        "hashtags": "#مسار #اقتصاد #تجارة #تحليل #جيوسياسة"
+        "country": "جنوب أفريقيا",
+        "fact": "وجنوب أفريقيا هي الدولة الوحيدة في العالم التي تمتلك ثلاث عواصم رسمية.",
+        "image_url": "https://images.pexels.com/photos/259280/pexels-photo-259280.jpeg"
+    },
+    {
+        "country": "اليابان",
+        "fact": "أما اليابان فتمتلك أسرع وأدق شبكة قطارات فائقة السرعة على كوكب الأرض.",
+        "image_url": "https://images.pexels.com/photos/161401/fuji-mountain-kawaguchiko-japan-161401.jpeg"
+    },
+    {
+        "country": "سؤال التفاعل",
+        "fact": "فما هي المعلومة الأبرز التي تميز دولتك؟ شاركنا في التعليقات!",
+        "image_url": "https://images.pexels.com/photos/87651/earth-blue-planet-globe-planet-87651.jpeg"
     }
 ]
 
-# روابط فيديوهات مباشرة ومفتوحة من Google Cloud لا تحظر سيرفرات Buffer أبداً
-FALLBACK_LANDSCAPE = [
-    "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-]
-FALLBACK_PORTRAIT = [
-    "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-    "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4"
-]
+def format_arabic_text(text):
+    """ضبط اتجاه وتشبيك النصوص العربية"""
+    reshaped_text = arabic_reshaper.reshape(text)
+    return get_display(reshaped_text)
 
-def get_video_url(query, orientation="landscape"):
-    """جلب الفيديو من Pexels أو استخدام الرابط المباشر الموثوق"""
-    if len(CLEAN_PEXELS_KEY) >= 50:
-        url = f"https://api.pexels.com/videos/search?query={query}&orientation={orientation}&per_page=15"
-        headers = {
-            "Authorization": CLEAN_PEXELS_KEY,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+def create_caption_image(text, size=(1080, 1920)):
+    """توليد صورة نصية شفافة مخصصة لتظهر بوضوح واحترافية فوق الفيديو"""
+    img = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 46)
+    except:
+        font = ImageFont.load_default()
+        
+    formatted = format_arabic_text(text)
+    
+    # تقسيم النص إلى أسطر قصيرة تناسب شاشات الشورتس
+    words = formatted.split()
+    lines = []
+    current_line = []
+    for word in words:
+        current_line.append(word)
+        if len(current_line) >= 4:
+            lines.append(" ".join(current_line))
+            current_line = []
+    if current_line:
+        lines.append(" ".join(current_line))
+        
+    y_start = int(size[1] * 0.70)
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        text_w = bbox[2] - bbox[0]
+        x = (size[0] - text_w) // 2
+        
+        # خلفية مظللة للنص لضمان سهولة القراءة
+        padding = 12
+        draw.rectangle([x - padding, y_start - padding, x + text_w + padding, y_start + (bbox[3] - bbox[1]) + padding], fill=(0, 0, 0, 180))
+        draw.text((x, y_start), line, font=font, fill=(255, 220, 0, 255))
+        y_start += (bbox[3] - bbox[1]) + 24
+        
+    overlay_path = f"overlay_{random.randint(100, 999)}.png"
+    img.save(overlay_path)
+    return overlay_path
+
+async def generate_speech(text, output_file):
+    """توليد الصوت العربي الفصيح عبر Edge-TTS"""
+    import edge_tts
+    voice = "ar-SA-HamedNeural"
+    communicate = edge_tts.Communicate(text, voice, rate="+10%")
+    await communicate.save(output_file)
+
+def build_scene(scene_data, index):
+    """بناء مشهد شورتس بدقة 1080x1920 مع صوت وحركة زوم مستمرة"""
+    print(f"🎬 جاري معالجة المشهد ({index + 1}): {scene_data['country']}")
+    
+    # 1. الصوت
+    audio_path = f"audio_{index}.mp3"
+    asyncio.run(generate_speech(scene_data["fact"], audio_path))
+    audio_clip = AudioFileClip(audio_path)
+    duration = audio_clip.duration + 0.3
+    
+    # 2. الصورة وتجهيزها
+    img_resp = requests.get(scene_data["image_url"], timeout=20)
+    raw_img_path = f"img_{index}.jpg"
+    with open(raw_img_path, "wb") as f:
+        f.write(img_resp.content)
+        
+    # ضبط مقاس الصورة على أبعاد الهواتف 9:16
+    im = Image.open(raw_img_path)
+    im = im.resize((1080, 1920), Image.Resampling.LANCZOS)
+    im.save(raw_img_path)
+    
+    # 3. تطبيق حركة التكبير التدريجي (Dynamic Zoom)
+    img_clip = (ImageClip(raw_img_path)
+                .set_duration(duration)
+                .resize(lambda t: 1 + 0.05 * t)
+                .crop(x_center=540, y_center=960, width=1080, height=1920))
+    
+    # 4. النص العربي فوق المشهد
+    caption_path = create_caption_image(scene_data["fact"])
+    caption_clip = ImageClip(caption_path).set_duration(duration)
+    
+    video = CompositeVideoClip([img_clip, caption_clip], size=(1080, 1920)).set_audio(audio_clip)
+    return video
+
+def create_complete_video():
+    """تجميع المشاهد في فيديو شورتس كامل وتصديره"""
+    scenes = []
+    selected_facts = FACTS_DATABASE.copy()
+    
+    for i, item in enumerate(selected_facts):
+        scene = build_scene(item, i)
+        scenes.append(scene)
+        
+    final = concatenate_videoclips(scenes, method="compose")
+    output_filename = "final_output.mp4"
+    final.write_videofile(
+        output_filename,
+        fps=24,
+        codec="libx264",
+        audio_codec="aac",
+        threads=4,
+        preset="ultrafast"
+    )
+    print("✨ تم اكتمال رندر الفيديو بنجاح!")
+    return output_filename
+
+def upload_to_temp_host(file_path):
+    """رفع الفيديو مؤقتاً للحصول على رابط مباشر تقبله منصة Buffer فوراً"""
+    print("☁️ جاري رفع الفيديو لتجهيز رابط النشر لـ Buffer...")
+    url = "https://litterbox.catbox.moe/resources/internals/api.php"
+    with open(file_path, "rb") as f:
+        files = {
+            "reqtype": (None, "fileupload"),
+            "time": (None, "12h"),
+            "fileToUpload": (file_path, f, "video/mp4")
         }
-        try:
-            res = requests.get(url, headers=headers, timeout=15)
-            if res.status_code == 200:
-                videos = res.json().get("videos", [])
-                if videos:
-                    chosen = random.choice(videos)
-                    files = chosen.get("video_files", [])
-                    best = next((vf for vf in files if vf.get("width", 0) >= 3840 or vf.get("height", 0) >= 2160), None)
-                    if not best and files:
-                        best = max(files, key=lambda x: (x.get("width", 0) * x.get("height", 0)))
-                    if best:
-                        print(f"✅ فيديو من Pexels بدقة: {best.get('width')}x{best.get('height')}")
-                        return best.get("link")
-            else:
-                print(f"⚠️ Pexels Status ({res.status_code}): {res.text}")
-        except Exception as e:
-            print(f"⚠️ استثناء Pexels: {e}")
+        res = requests.post(url, files=files, timeout=60)
+        if res.status_code == 200 and res.text.startswith("http"):
+            direct_url = res.text.strip()
+            print(f"🔗 رابط الفيديو المباشر: {direct_url}")
+            return direct_url
+    raise Exception("فشل رفع ملف الفيديو إلى الخادم المؤقت.")
 
-    print("ℹ️ جاري استخدام رابط فيديو مباشر وموثوق لـ Buffer...")
-    return random.choice(FALLBACK_PORTRAIT if orientation == "portrait" else FALLBACK_LANDSCAPE)
-
-def publish_to_buffer_graphql(channel_id, video_title, description_text, video_url):
-    """الجدولة عبر Buffer GraphQL API مع كامل المتطلبات"""
+def publish_to_buffer(channel_id, title, video_url):
+    """جدولة الفيديو على منصة Buffer"""
     url = "https://api.buffer.com"
     headers = {
         "Authorization": f"Bearer {BUFFER_TOKEN}",
@@ -115,7 +205,7 @@ def publish_to_buffer_graphql(channel_id, video_title, description_text, video_u
     variables = {
         "input": {
             "channelId": channel_id,
-            "text": description_text,
+            "text": f"{title}\n\n#حقائق #جغرافيا #هل_تعلم #Shorts #explore",
             "schedulingType": "automatic",
             "mode": "addToQueue",
             "assets": [
@@ -127,7 +217,7 @@ def publish_to_buffer_graphql(channel_id, video_title, description_text, video_u
             ],
             "metadata": {
                 "youtube": {
-                    "title": video_title[:95],
+                    "title": title[:95],
                     "categoryId": "27",
                     "madeForKids": False
                 }
@@ -135,43 +225,26 @@ def publish_to_buffer_graphql(channel_id, video_title, description_text, video_u
         }
     }
 
-    try:
-        response = requests.post(url, headers=headers, json={"query": query, "variables": variables}, timeout=35)
-        res_data = response.json()
-        
-        if "errors" in res_data:
-            print(f"❌ خطأ GraphQL للقناة [{channel_id}]: {res_data['errors']}")
-        else:
-            result = res_data.get("data", {}).get("createPost", {})
-            if "post" in result and result["post"]:
-                print(f"🚀 تم بنجاح جدولة الفيديو للقناة [{channel_id}] | Post ID: {result['post']['id']}")
-            elif "message" in result:
-                print(f"⚠️ استجابة Buffer للقناة [{channel_id}]: {result['message']}")
-            else:
-                print(f"✅ استجابة Buffer: {res_data}")
-    except Exception as e:
-        print(f"❌ استثناء أثناء الاتصال بـ Buffer: {e}")
+    res = requests.post(url, headers=headers, json={"query": query, "variables": variables}, timeout=30)
+    data = res.json()
+    result = data.get("data", {}).get("createPost", {})
+    if "post" in result and result["post"]:
+        print(f"🚀 تم جدولته بنجاح للقناة [{channel_id}] | ID: {result['post']['id']}")
+    else:
+        print(f"⚠️ استجابة Buffer: {data}")
 
-def run_job(job_type):
-    is_short = (job_type == "short")
-    orientation = "portrait" if is_short else "landscape"
-
-    for idx, channel_id in enumerate(channels_list):
-        template = CHANNEL_TEMPLATES[idx % len(CHANNEL_TEMPLATES)]
-        print(f"\n--- جاري المعالجة: {template['name']} ({channel_id}) [{job_type}] ---")
-        
-        keyword = random.choice(template["keywords"])
-        video_url = get_video_url(keyword, orientation=orientation)
-        
-        if is_short:
-            video_title = f"{template['name']} | تفاصيل مذهلة بدقة فائقة"
-            description = f"شاهد روعة المشهد وتفاصيل مذهلة بتقنية 4K ⚡\n\n{template['hashtags']} #Shorts #4K"
-        else:
-            video_title = f"وثائقي حصري: {template['name']} وأسرار المستقبل"
-            description = f"وثائقي حصري بجودة فائقة 4K: تحليل شامل وأسرار حصرية 🌍🎬\n\n{template['hashtags']}"
-            
-        publish_to_buffer_graphql(channel_id, video_title, description, video_url)
+def main():
+    # 1. إنشاء الفيديو بالكامل
+    video_file = create_complete_video()
+    
+    # 2. رفعه والحصول على رابط MP4 مباشر
+    public_url = upload_to_temp_host(video_file)
+    
+    # 3. جدولته على قنواتك الثلاث
+    title = "حقائق ومعلومات مذهلة حول دول العالم 🌍⚡"
+    for channel_id in CHANNELS_LIST:
+        print(f"\n--- إرسال إلى Buffer للقناة: {channel_id} ---")
+        publish_to_buffer(channel_id, title, public_url)
 
 if __name__ == "__main__":
-    target = sys.argv[1] if len(sys.argv) > 1 else "short"
-    run_job(target)
+    main()
