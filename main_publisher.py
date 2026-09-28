@@ -2,8 +2,14 @@ import os
 import sys
 import random
 import asyncio
-import re
+import io
 import requests
+
+# ترقيع توافق moviepy مع Pillow
+import PIL.Image
+if not hasattr(PIL.Image, 'ANTIALIAS'):
+    PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
+
 from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
@@ -24,32 +30,32 @@ DEFAULT_CHANNELS = [
 env_channel_str = os.getenv("BUFFER_CHANNEL_IDS", "").strip()
 CHANNELS_LIST = [ch.strip() for ch in env_channel_str.replace("\n", ",").split(",") if ch.strip()] if env_channel_str else DEFAULT_CHANNELS
 
-# 2. بنك المعلومات والخرائط ثلاثية الأبعاد (3D Maps Assets)
+# 2. بنك المعلومات والمشاهد بروابط CDN مباشرة ومستقرة بمقاس 1080x1920
 FACTS_DATABASE = [
     {
         "country": "بريطانيا",
         "fact": "هل تعلم أن بريطانيا هي الدولة الوحيدة التي لم تُستعمر في التاريخ الحديث؟",
-        "image_url": "https://images.pexels.com/photos/460672/pexels-photo-460672.jpeg"
+        "image_url": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1080&h=1920&fit=crop"
     },
     {
         "country": "ألمانيا",
         "fact": "بينما تمتلك ألمانيا أقوى وأضخم اقتصاد صناعي في قارة أوروبا بأكملها.",
-        "image_url": "https://images.pexels.com/photos/109629/pexels-photo-109629.jpeg"
+        "image_url": "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=1080&h=1920&fit=crop"
     },
     {
         "country": "جنوب أفريقيا",
         "fact": "وجنوب أفريقيا هي الدولة الوحيدة في العالم التي تمتلك ثلاث عواصم رسمية.",
-        "image_url": "https://images.pexels.com/photos/259280/pexels-photo-259280.jpeg"
+        "image_url": "https://images.unsplash.com/photo-1576485290814-1c72aa4bbb8e?w=1080&h=1920&fit=crop"
     },
     {
         "country": "اليابان",
         "fact": "أما اليابان فتمتلك أسرع وأدق شبكة قطارات فائقة السرعة على كوكب الأرض.",
-        "image_url": "https://images.pexels.com/photos/161401/fuji-mountain-kawaguchiko-japan-161401.jpeg"
+        "image_url": "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?w=1080&h=1920&fit=crop"
     },
     {
         "country": "سؤال التفاعل",
         "fact": "فما هي المعلومة الأبرز التي تميز دولتك؟ شاركنا في التعليقات!",
-        "image_url": "https://images.pexels.com/photos/87651/earth-blue-planet-globe-planet-87651.jpeg"
+        "image_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1080&h=1920&fit=crop"
     }
 ]
 
@@ -59,18 +65,17 @@ def format_arabic_text(text):
     return get_display(reshaped_text)
 
 def create_caption_image(text, size=(1080, 1920)):
-    """توليد صورة نصية شفافة مخصصة لتظهر بوضوح واحترافية فوق الفيديو"""
+    """توليد صورة نصية شفافة مخصصة لتظهر بوضوح فوق الفيديو"""
     img = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 46)
-    except:
+    except Exception:
         font = ImageFont.load_default()
         
     formatted = format_arabic_text(text)
     
-    # تقسيم النص إلى أسطر قصيرة تناسب شاشات الشورتس
     words = formatted.split()
     lines = []
     current_line = []
@@ -88,9 +93,11 @@ def create_caption_image(text, size=(1080, 1920)):
         text_w = bbox[2] - bbox[0]
         x = (size[0] - text_w) // 2
         
-        # خلفية مظللة للنص لضمان سهولة القراءة
-        padding = 12
-        draw.rectangle([x - padding, y_start - padding, x + text_w + padding, y_start + (bbox[3] - bbox[1]) + padding], fill=(0, 0, 0, 180))
+        padding = 14
+        draw.rectangle(
+            [x - padding, y_start - padding, x + text_w + padding, y_start + (bbox[3] - bbox[1]) + padding],
+            fill=(0, 0, 0, 185)
+        )
         draw.text((x, y_start), line, font=font, fill=(255, 220, 0, 255))
         y_start += (bbox[3] - bbox[1]) + 24
         
@@ -105,34 +112,54 @@ async def generate_speech(text, output_file):
     communicate = edge_tts.Communicate(text, voice, rate="+10%")
     await communicate.save(output_file)
 
+def get_scene_image(image_url, country_name, index):
+    """تحميل الصورة بأمان تام مع نظام استرجاع تلقائي يمنع أي انهيار"""
+    raw_path = f"img_{index}.jpg"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        resp = requests.get(image_url, headers=headers, timeout=20)
+        if resp.status_code == 200 and len(resp.content) > 3000:
+            # التحقق من أن الملف صورة صالحة فعلياً
+            test_img = Image.open(io.BytesIO(resp.content))
+            test_img.verify()
+            
+            # إعادة الفتح للمعالجة والتحويل
+            im = Image.open(io.BytesIO(resp.content)).convert("RGB")
+            im = im.resize((1080, 1920), Image.Resampling.LANCZOS)
+            im.save(raw_path, "JPEG", quality=90)
+            return raw_path
+    except Exception as e:
+        print(f"⚠️ تنبيه: تعذر جلب صورة {country_name} ({e})، سيتم توليد خلفية بديلة.")
+
+    # خلفية سينمائية أنيقة متدرجة كبديل مباشر
+    fallback_img = Image.new("RGB", (1080, 1920), color=(15, 23, 42))
+    draw = ImageDraw.Draw(fallback_img)
+    draw.rectangle([40, 40, 1040, 1880], outline=(56, 189, 248), width=8)
+    fallback_img.save(raw_path, "JPEG")
+    return raw_path
+
 def build_scene(scene_data, index):
-    """بناء مشهد شورتس بدقة 1080x1920 مع صوت وحركة زوم مستمرة"""
+    """بناء مشهد الشورتس مع الصوت وحركة التكبير والنصوص"""
     print(f"🎬 جاري معالجة المشهد ({index + 1}): {scene_data['country']}")
     
-    # 1. الصوت
+    # 1. توليد الصوت
     audio_path = f"audio_{index}.mp3"
     asyncio.run(generate_speech(scene_data["fact"], audio_path))
     audio_clip = AudioFileClip(audio_path)
     duration = audio_clip.duration + 0.3
     
-    # 2. الصورة وتجهيزها
-    img_resp = requests.get(scene_data["image_url"], timeout=20)
-    raw_img_path = f"img_{index}.jpg"
-    with open(raw_img_path, "wb") as f:
-        f.write(img_resp.content)
-        
-    # ضبط مقاس الصورة على أبعاد الهواتف 9:16
-    im = Image.open(raw_img_path)
-    im = im.resize((1080, 1920), Image.Resampling.LANCZOS)
-    im.save(raw_img_path)
+    # 2. تجهيز الصورة الآمنة
+    img_path = get_scene_image(scene_data["image_url"], scene_data["country"], index)
     
-    # 3. تطبيق حركة التكبير التدريجي (Dynamic Zoom)
-    img_clip = (ImageClip(raw_img_path)
+    # 3. حركة التكبير التدريجي (Zoom Effect)
+    img_clip = (ImageClip(img_path)
                 .set_duration(duration)
-                .resize(lambda t: 1 + 0.05 * t)
+                .resize(lambda t: 1 + 0.04 * t)
                 .crop(x_center=540, y_center=960, width=1080, height=1920))
     
-    # 4. النص العربي فوق المشهد
+    # 4. النص العربي
     caption_path = create_caption_image(scene_data["fact"])
     caption_clip = ImageClip(caption_path).set_duration(duration)
     
@@ -140,11 +167,9 @@ def build_scene(scene_data, index):
     return video
 
 def create_complete_video():
-    """تجميع المشاهد في فيديو شورتس كامل وتصديره"""
+    """تجميع المشاهد ورندرة الفيديو النهائي"""
     scenes = []
-    selected_facts = FACTS_DATABASE.copy()
-    
-    for i, item in enumerate(selected_facts):
+    for i, item in enumerate(FACTS_DATABASE):
         scene = build_scene(item, i)
         scenes.append(scene)
         
@@ -162,8 +187,8 @@ def create_complete_video():
     return output_filename
 
 def upload_to_temp_host(file_path):
-    """رفع الفيديو مؤقتاً للحصول على رابط مباشر تقبله منصة Buffer فوراً"""
-    print("☁️ جاري رفع الفيديو لتجهيز رابط النشر لـ Buffer...")
+    """رفع الفيديو مؤقتاً للحصول على رابط MP4 مباشر لمنصة Buffer"""
+    print("☁️ جاري رفع الفيديو وتجهيز الرابط لـ Buffer...")
     url = "https://litterbox.catbox.moe/resources/internals/api.php"
     with open(file_path, "rb") as f:
         files = {
@@ -176,10 +201,10 @@ def upload_to_temp_host(file_path):
             direct_url = res.text.strip()
             print(f"🔗 رابط الفيديو المباشر: {direct_url}")
             return direct_url
-    raise Exception("فشل رفع ملف الفيديو إلى الخادم المؤقت.")
+    raise Exception("فشل رفع ملف الفيديو إلى خادم الوسائط المؤقت.")
 
 def publish_to_buffer(channel_id, title, video_url):
-    """جدولة الفيديو على منصة Buffer"""
+    """جدولة الفيديو على منصة Buffer عبر GraphQL API"""
     url = "https://api.buffer.com"
     headers = {
         "Authorization": f"Bearer {BUFFER_TOKEN}",
@@ -231,16 +256,12 @@ def publish_to_buffer(channel_id, title, video_url):
     if "post" in result and result["post"]:
         print(f"🚀 تم جدولته بنجاح للقناة [{channel_id}] | ID: {result['post']['id']}")
     else:
-        print(f"⚠️ استجابة Buffer: {data}")
+        print(f"⚠️ استجابة Buffer للقناة [{channel_id}]: {data}")
 
 def main():
-    # 1. إنشاء الفيديو بالكامل
     video_file = create_complete_video()
-    
-    # 2. رفعه والحصول على رابط MP4 مباشر
     public_url = upload_to_temp_host(video_file)
     
-    # 3. جدولته على قنواتك الثلاث
     title = "حقائق ومعلومات مذهلة حول دول العالم 🌍⚡"
     for channel_id in CHANNELS_LIST:
         print(f"\n--- إرسال إلى Buffer للقناة: {channel_id} ---")
