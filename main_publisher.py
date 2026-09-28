@@ -5,7 +5,7 @@ import asyncio
 import io
 import requests
 
-# ترقيع توافق Pillow مع moviepy
+# ترقيع توافق moviepy مع مكتبة Pillow
 import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
@@ -20,7 +20,7 @@ from moviepy.editor import (
     concatenate_videoclips
 )
 
-# 1. المفاتيح والقنوات
+# 1. إعدادات المفاتيح والقنوات
 BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
 DEFAULT_CHANNELS = [
     "6abacd06ea19ca0bde180ef9",
@@ -30,7 +30,7 @@ DEFAULT_CHANNELS = [
 env_channel_str = os.getenv("BUFFER_CHANNEL_IDS", "").strip()
 CHANNELS_LIST = [ch.strip() for ch in env_channel_str.replace("\n", ",").split(",") if ch.strip()] if env_channel_str else DEFAULT_CHANNELS
 
-# 2. ضبط النصوص العربية بدون عكس الحروف أو تفرقتها
+# 2. معالجة النصوص العربية دون عكس الحروف أو تفرقتها
 def format_arabic_correctly(text):
     """تشبيك الحروف العربية وضبط الترتيب من اليمين لليسار بدقة"""
     reshaped = arabic_reshaper.reshape(text)
@@ -46,7 +46,6 @@ def create_arabic_caption(text, size=(1080, 1920)):
     except Exception:
         font = ImageFont.load_default()
         
-    # تقسيم الكلمات إلى أسطر قبل تطبيق الـ Bidi لعدم قلب ترتيب الكلمات
     words = text.split()
     raw_lines = []
     current = []
@@ -58,7 +57,6 @@ def create_arabic_caption(text, size=(1080, 1920)):
     if current:
         raw_lines.append(" ".join(current))
         
-    # تعريب وتشبيك كل سطر بشكل منفصل
     formatted_lines = [format_arabic_correctly(line) for line in raw_lines]
     
     y_start = int(size[1] * 0.70)
@@ -100,12 +98,11 @@ def fetch_image(url, target_size, index):
     except Exception:
         pass
     
-    # خلفية بديلة أنيقة في حال انقطاع السيرفر
     im = Image.new("RGB", target_size, color=(15, 23, 42))
     im.save(path, "JPEG")
     return path
 
-# 3. بنك محتوى الشورتس (9:16 عمودي)
+# 3. بنك محتوى الشورتس (9:16 رأسي)
 SHORTS_DATA = [
     {"fact": "هل تعلم أن بريطانيا هي الدولة الوحيدة التي لم تُستعمر في التاريخ الحديث؟", "img": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1080&h=1920&fit=crop"},
     {"fact": "بينما تمتلك ألمانيا أقوى وأضخم اقتصاد صناعي متطور في قارة أوروبا.", "img": "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=1080&h=1920&fit=crop"},
@@ -114,7 +111,7 @@ SHORTS_DATA = [
     {"fact": "فما هي المعلومة الأبرز التي تميز دولتك؟ شاركنا رأيك في التعليقات!", "img": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1080&h=1920&fit=crop"}
 ]
 
-# 4. بنك محتوى الفيلم الوثائقي الطويل (16:9 أفقي بدقة 1920x1080 على نسق DW)
+# 4. بنك محتوى الفيلم الوثائقي الطويل (16:9 سينمائي أفقي)
 DOCUMENTARY_CHAPTERS = [
     {
         "title": "المقدمة: لغز نشأة الحضارات والجغرافيا",
@@ -149,22 +146,19 @@ def build_video(mode="short"):
     
     for idx, item in enumerate(dataset):
         text = item["fact"] if is_short else item["narration"]
-        print(f"🎙️ معالجة الجزء ({idx + 1}/{len(dataset)})...")
+        print(f"🎙️ معالجة المشهد ({idx + 1}/{len(dataset)})...")
         
-        # 1. الصوت
         audio_file = f"aud_{idx}.mp3"
         asyncio.run(generate_voice(text, audio_file))
         aud_clip = AudioFileClip(audio_file)
         duration = aud_clip.duration + 0.5
         
-        # 2. الصورة وتأثير التكبير السينمائي
         img_path = fetch_image(item["img"], size, idx)
         img_clip = (ImageClip(img_path)
                     .set_duration(duration)
                     .resize(lambda t: 1 + 0.03 * t)
                     .crop(x_center=size[0]//2, y_center=size[1]//2, width=size[0], height=size[1]))
         
-        # 3. النصوص (فقط في الشورتس بطلب المشاهدين، الوثائقي شاشة سينمائية نقية)
         if is_short:
             caption_file = create_arabic_caption(text, size=size)
             caption_clip = ImageClip(caption_file).set_duration(duration)
@@ -181,40 +175,73 @@ def build_video(mode="short"):
         fps=24,
         codec="libx264",
         audio_codec="aac",
+        bitrate="2800k" if mode == "long" else "2200k",
         threads=4,
-        preset="ultrafast"
+        preset="veryfast"
     )
     print(f"✨ اكتمل تصدير الفيديو: {out_name}")
     return out_name
 
 def upload_video_file(file_path):
-    """رفع الفيديو عبر خوادم تدعم Buffer المباشر"""
+    """رفع الفيديو عبر خوادم سريعة ومباشرة تقبل ملفات الفيديو وتدعم Buffer"""
     print("☁️ جاري رفع الفيديو وتجهيز الرابط لـ Buffer...")
 
-    # 1. 0x0.st
+    # 1. Pixeldrain (الرابط الرسمي الصحيح للملفات المباشرة)
     try:
+        print("🔄 محاولة الرفع عبر Pixeldrain...")
         with open(file_path, "rb") as f:
-            r = requests.post("https://0x0.st", files={"file": (os.path.basename(file_path), f, "video/mp4")}, timeout=120)
-            if r.status_code == 200 and r.text.strip().startswith("http"):
-                url = r.text.strip()
-                print(f"🔗 رابط الرفع (0x0.st): {url}")
-                return url
-    except Exception as e:
-        print(f"⚠️ تعذر 0x0: {e}")
-
-    # 2. Pixeldrain
-    try:
-        with open(file_path, "rb") as f:
-            r = requests.post(f"https://pixeldrain.com/api/file/{os.path.basename(file_path)}", files={"file": f}, timeout=120)
+            r = requests.post(
+                "https://pixeldrain.com/api/file",
+                files={"file": (os.path.basename(file_path), f, "video/mp4")},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=180
+            )
             if r.status_code in [200, 201]:
-                fid = r.json().get("id")
-                url = f"https://pixeldrain.com/api/file/{fid}"
-                print(f"🔗 رابط الرفع (Pixeldrain): {url}")
-                return url
+                data = r.json()
+                if data.get("id"):
+                    url = f"https://pixeldrain.com/api/file/{data['id']}"
+                    print(f"🔗 تم الرفع بنجاح عبر Pixeldrain: {url}")
+                    return url
     except Exception as e:
         print(f"⚠️ تعذر Pixeldrain: {e}")
 
-    raise Exception("فشلت جميع خوادم الرفع.")
+    # 2. Uguu (خادم مباشر عالي السرعة لملفات الفيديو)
+    try:
+        print("🔄 محاولة الرفع عبر Uguu...")
+        with open(file_path, "rb") as f:
+            r = requests.post(
+                "https://uguu.se/upload",
+                files={"files[]": (os.path.basename(file_path), f, "video/mp4")},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=180
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("success") and data.get("files"):
+                    url = data["files"][0]["url"]
+                    print(f"🔗 تم الرفع بنجاح عبر Uguu: {url}")
+                    return url
+    except Exception as e:
+        print(f"⚠️ تعذر Uguu: {e}")
+
+    # 3. 0x0.st (مع مهلة أطول)
+    try:
+        print("🔄 محاولة الرفع عبر 0x0.st...")
+        with open(file_path, "rb") as f:
+            r = requests.post(
+                "https://0x0.st",
+                files={"file": (os.path.basename(file_path), f, "video/mp4")},
+                headers={"User-Agent": "curl/8.0.0"},
+                timeout=240
+            )
+            if r.status_code == 200 and r.text.strip().startswith("http"):
+                url = r.text.strip()
+                print(f"🔗 تم الرفع بنجاح عبر 0x0.st: {url}")
+                return url
+    except Exception as e:
+        print(f"⚠️ تعذر 0x0.st: {e}")
+
+    raise Exception("فشلت جميع خوادم الرفع المباشر.")
 
 def publish_post(channel_id, title, desc, video_url):
     """إرسال المنشور إلى Buffer عبر GraphQL"""
@@ -244,7 +271,7 @@ def publish_post(channel_id, title, desc, video_url):
             }
         }
     }
-    r = requests.post(url, headers=headers, json={"query": query, "variables": variables}, timeout=30)
+    r = requests.post(url, headers=headers, json={"query": query, "variables": variables}, timeout=35)
     data = r.json()
     result = data.get("data", {}).get("createPost", {})
     if "post" in result and result["post"]:
@@ -253,16 +280,11 @@ def publish_post(channel_id, title, desc, video_url):
         print(f"⚠️ استجابة Buffer: {data}")
 
 def main():
-    # قراءة نوع المهمة من سطر الأوامر (short أو long)
     job_type = sys.argv[1].lower() if len(sys.argv) > 1 else "short"
     
-    # 1. إنتاج الفيديو بالمقاس الصحيح (رأسي للشورتس أو أفقي للوثائقي)
     video_path = build_video(job_type)
-    
-    # 2. الرفع للحصول على الرابط
     video_url = upload_video_file(video_path)
     
-    # 3. إعداد البيانات والنشر
     if job_type == "short":
         title = "حقائق ومعلومات مذهلة حول دول العالم 🌍⚡"
         desc = "شاهد أغرب الحقائق الجغرافية والمعلومات السريعة حول العالم 🎬⚡\n\n#حقائق #جغرافيا #هل_تعلم #Shorts #explore"
