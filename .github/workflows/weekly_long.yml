@@ -1,0 +1,30 @@
+name: Weekly Long Video Publisher (4K)
+
+on:
+  schedule:
+    - cron: '0 15 * * 5'  # كل يوم جمعة الساعة 6:00 مساءً
+  workflow_dispatch:      # لتجربة التشغيل يدوياً
+
+jobs:
+  publish_long:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Long Video Publisher
+        env:
+          BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          BUFFER_CHANNEL_ABAAD: ${{ secrets.BUFFER_CHANNEL_ABAAD }}
+          BUFFER_CHANNEL_MEGABUILDS: ${{ secrets.BUFFER_CHANNEL_MEGABUILDS }}
+          BUFFER_CHANNEL_MASAR: ${{ secrets.BUFFER_CHANNEL_MASAR }}
+        run: python main_publisher.py long
