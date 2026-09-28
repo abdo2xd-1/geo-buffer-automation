@@ -43,7 +43,7 @@ CHANNEL_TEMPLATES = [
     }
 ]
 
-# روابط فيديوهات 4K احتياطية
+# روابط فيديوهات احتياطية
 FALLBACK_4K_LANDSCAPE = [
     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
@@ -80,14 +80,13 @@ def get_video_url(query, orientation="landscape"):
     return random.choice(FALLBACK_4K_PORTRAIT if orientation == "portrait" else FALLBACK_4K_LANDSCAPE)
 
 def publish_to_buffer_graphql(channel_id, text, video_url):
-    """الجدولة عبر Buffer GraphQL API الجديد والموصى به"""
+    """الجدولة عبر Buffer GraphQL API المصحح"""
     url = "https://api.buffer.com"
     headers = {
         "Authorization": f"Bearer {BUFFER_TOKEN}",
         "Content-Type": "application/json"
     }
 
-    # استعلام إنشاء المنشور بنظام GraphQL
     query = """
     mutation CreatePost($input: CreatePostInput!) {
       createPost(input: $input) {
@@ -97,7 +96,7 @@ def publish_to_buffer_graphql(channel_id, text, video_url):
             status
           }
         }
-        ... on PostActionError {
+        ... on MutationError {
           message
         }
       }
