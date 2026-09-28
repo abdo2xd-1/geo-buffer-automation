@@ -3,19 +3,15 @@ import sys
 import random
 import requests
 
-# 1. جلب المفاتيح وتنظيفها تلقائياً من أي محارف غير صالحة
-RAW_BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "")
-RAW_PEXELS_KEY = os.getenv("PEXELS_API_KEY", "")
-
-# تنظيف المفاتيح لتقبل أحرف ASCII اللاتينية فقط والتخلص من أي مسافات أو رموز غريبة
-BUFFER_TOKEN = RAW_BUFFER_TOKEN.strip()
-PEXELS_API_KEY = "".join([c for c in RAW_PEXELS_KEY.strip() if ord(c) < 128])
+# 1. جلب المفاتيح من أسرار GitHub وتنظيفها تلقائياً من المسافات
+BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 
 print(f"🔑 Pexels Key Length: {len(PEXELS_API_KEY)}")
 if len(PEXELS_API_KEY) > 8:
     print(f"🔑 Key Preview: {PEXELS_API_KEY[:4]}...{PEXELS_API_KEY[-4:]}")
 
-# 2. إعدادات القنوات والكلمات المفتاحية
+# 2. إعدادات القنوات والكلمات المفتاحية المخصصة لكل قناة لضمان اختلاف المحتوى
 CHANNELS = {
     "abaad_geo": {
         "name": "أبعاد جغرافية",
@@ -38,8 +34,14 @@ CHANNELS = {
 }
 
 def get_pexels_4k_video(query, orientation="landscape"):
+    """
+    سحب فيديو بجودة 4K أو أعلى دقة متاحة من Pexels
+    orientation: 'landscape' للفيديوهات الطويلة، 'portrait' للشورتس
+    """
     url = f"https://api.pexels.com/videos/search?query={query}&orientation={orientation}&per_page=15"
-    headers = {"Authorization": PEXELS_API_KEY}
+    headers = {
+        "Authorization": PEXELS_API_KEY
+    }
     
     try:
         response = requests.get(url, headers=headers)
@@ -53,9 +55,11 @@ def get_pexels_4k_video(query, orientation="landscape"):
             print(f"⚠️ لم يتم العثور على فيديوهات للكلمة: {query}")
             return None
         
+        # اختيار فيديو عشوائي من النتائج لضمان التجديد والتنويع
         chosen_video = random.choice(videos)
         video_files = chosen_video.get("video_files", [])
         
+        # البحث عن جودة 4K (عرض أو ارتفاع لا يقل عن 2160 أو 3840)
         best_file = None
         for vf in video_files:
             width = vf.get("width", 0)
@@ -64,6 +68,7 @@ def get_pexels_4k_video(query, orientation="landscape"):
                 best_file = vf
                 break
         
+        # إذا لم يتوفر ملف 4K صريح، نأخذ أعلى جودة متوفرة (UHD / HD)
         if not best_file and video_files:
             best_file = max(video_files, key=lambda x: (x.get("width", 0) * x.get("height", 0)))
             
@@ -77,6 +82,7 @@ def get_pexels_4k_video(query, orientation="landscape"):
     return None
 
 def publish_to_buffer(channel_id, text, video_url):
+    """جدولة الفيديو على منصة Buffer"""
     url = "https://api.bufferapp.com/1/updates/create.json"
     headers = {
         "Authorization": f"Bearer {BUFFER_TOKEN}",
@@ -86,7 +92,7 @@ def publish_to_buffer(channel_id, text, video_url):
     payload = {
         "profile_ids[]": channel_id,
         "text": text,
-        "now": False,
+        "now": False,  # للإدراج التلقائي في الجدول (Schedule)
         "media[video]": video_url
     }
     
@@ -100,6 +106,9 @@ def publish_to_buffer(channel_id, text, video_url):
         print(f"❌ استثناء في Buffer: {e}")
 
 def run_job(job_type):
+    """
+    job_type: 'short' للنشر اليومي الرأسي، أو 'long' للنشر الأسبوعي الأفقي
+    """
     is_short = (job_type == "short")
     orientation = "portrait" if is_short else "landscape"
     
