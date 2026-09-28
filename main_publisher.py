@@ -5,7 +5,7 @@ import asyncio
 import io
 import requests
 
-# ترقيع توافق moviepy مع إصدارات Pillow الحديثة
+# ترقيع توافق moviepy مع Pillow
 import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
@@ -180,53 +180,61 @@ def create_complete_video():
     return output_filename
 
 def upload_to_temp_host(file_path):
-    """رفع الفيديو مع محاولات متتالية عبر خوادم متعددة لضمان الحصول على رابط مباشر"""
-    print("☁️ جاري رفع الفيديو وتجهيز الرابط لـ Buffer...")
+    """رفع الفيديو إلى سيرفر وسائط مباشر متوافق 100% مع Buffer"""
+    print("☁️ جاري رفع الفيديو وتجهيز الرابط المباشر لـ Buffer...")
 
-    # 1. الخيار الأول: tmpfiles.org
+    # 1. Catbox (رابط مباشر ثابت وسريع بدون Cloudflare)
     try:
-        print("🔄 محاولة الرفع عبر tmpfiles.org...")
+        print("🔄 محاولة الرفع عبر Catbox...")
         with open(file_path, "rb") as f:
-            resp = requests.post("https://tmpfiles.org/api/v1/upload", files={"file": f}, timeout=60)
-            if resp.status_code == 200:
-                raw_url = resp.json().get("data", {}).get("url", "")
-                if raw_url:
-                    direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
-                    print(f"🔗 تم بنجاح! رابط الفيديو: {direct_url}")
-                    return direct_url
-    except Exception as e:
-        print(f"⚠️ فشل الرفع عبر tmpfiles ({e})، جاري التبديل للخادم البديل...")
-
-    # 2. الخيار الثاني: 0x0.st
-    try:
-        print("🔄 محاولة الرفع عبر 0x0.st...")
-        with open(file_path, "rb") as f:
-            resp = requests.post("https://0x0.st", files={"file": f}, timeout=60)
+            resp = requests.post(
+                "https://catbox.moe/user/api.php",
+                data={"reqtype": "fileupload"},
+                files={"fileToUpload": (os.path.basename(file_path), f, "video/mp4")},
+                timeout=120
+            )
             if resp.status_code == 200 and resp.text.strip().startswith("http"):
-                direct_url = resp.text.strip()
-                print(f"🔗 تم بنجاح! رابط الفيديو: {direct_url}")
-                return direct_url
+                url = resp.text.strip()
+                print(f"🔗 تم الرفع بنجاح عبر Catbox: {url}")
+                return url
     except Exception as e:
-        print(f"⚠️ فشل الرفع عبر 0x0.st ({e})، جاري تجربة خادم آخر...")
+        print(f"⚠️ خطأ Catbox: {e}")
 
-    # 3. الخيار الثالث: litterbox
+    # 2. Litterbox (خادم احتياطي مؤقت 24 ساعة)
     try:
-        print("🔄 محاولة الرفع عبر litterbox...")
+        print("🔄 محاولة الرفع عبر Litterbox...")
         with open(file_path, "rb") as f:
-            files = {
-                "reqtype": (None, "fileupload"),
-                "time": (None, "12h"),
-                "fileToUpload": (file_path, f, "video/mp4")
-            }
-            resp = requests.post("https://litterbox.catbox.moe/resources/internals/api.php", files=files, timeout=60)
+            resp = requests.post(
+                "https://litterbox.catbox.moe/resources/internals/api.php",
+                data={"reqtype": "fileupload", "time": "24h"},
+                files={"fileToUpload": (os.path.basename(file_path), f, "video/mp4")},
+                timeout=120
+            )
             if resp.status_code == 200 and resp.text.strip().startswith("http"):
-                direct_url = resp.text.strip()
-                print(f"🔗 تم بنجاح! رابط الفيديو: {direct_url}")
-                return direct_url
+                url = resp.text.strip()
+                print(f"🔗 تم الرفع بنجاح عبر Litterbox: {url}")
+                return url
     except Exception as e:
-        print(f"⚠️ فشل الرفع عبر litterbox ({e})")
+        print(f"⚠️ خطأ Litterbox: {e}")
 
-    raise Exception("تعذر رفع الفيديو إلى جميع الخوادم البديلة.")
+    # 3. Transfer.sh (بديل ثالث مباشر)
+    try:
+        print("🔄 محاولة الرفع عبر Transfer.sh...")
+        with open(file_path, "rb") as f:
+            resp = requests.put(
+                f"https://transfer.sh/{os.path.basename(file_path)}",
+                data=f,
+                headers={"Content-Type": "video/mp4"},
+                timeout=120
+            )
+            if resp.status_code in [200, 201] and resp.text.strip().startswith("http"):
+                url = resp.text.strip()
+                print(f"🔗 تم الرفع بنجاح عبر Transfer.sh: {url}")
+                return url
+    except Exception as e:
+        print(f"⚠️ خطأ Transfer.sh: {e}")
+
+    raise Exception("فشلت جميع خوادم الرفع المباشر.")
 
 def publish_to_buffer(channel_id, title, video_url):
     """جدولة الفيديو على منصة Buffer عبر GraphQL API"""
