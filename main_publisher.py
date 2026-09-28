@@ -43,7 +43,7 @@ CHANNEL_TEMPLATES = [
     }
 ]
 
-# روابط فيديوهات احتياطية
+# روابط فيديوهات 4K احتياطية صالحة ومباشرة
 FALLBACK_4K_LANDSCAPE = [
     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
@@ -54,7 +54,7 @@ FALLBACK_4K_PORTRAIT = [
 ]
 
 def get_video_url(query, orientation="landscape"):
-    """جلب الفيديو من Pexels أو استخدام الرابط الاحتياطي"""
+    """جلب الفيديو من Pexels أو استخدام الرابط المباشر الاحتياطي"""
     if len(CLEAN_PEXELS_KEY) >= 50:
         url = f"https://api.pexels.com/videos/search?query={query}&orientation={orientation}&per_page=15"
         headers = {"Authorization": CLEAN_PEXELS_KEY}
@@ -76,11 +76,11 @@ def get_video_url(query, orientation="landscape"):
         except Exception as e:
             print(f"⚠️ استثناء Pexels: {e}")
 
-    print("ℹ️ جاري استخدام رابط فيديو بدقة عالية احتياطي...")
+    print("ℹ️ جاري استخدام رابط فيديو عالي الدقة احتياطي...")
     return random.choice(FALLBACK_4K_PORTRAIT if orientation == "portrait" else FALLBACK_4K_LANDSCAPE)
 
 def publish_to_buffer_graphql(channel_id, text, video_url):
-    """الجدولة عبر Buffer GraphQL API المصحح"""
+    """الجدولة عبر Buffer GraphQL API وفق المخطط الرسمي المحدث"""
     url = "https://api.buffer.com"
     headers = {
         "Authorization": f"Bearer {BUFFER_TOKEN}",
@@ -103,29 +103,35 @@ def publish_to_buffer_graphql(channel_id, text, video_url):
     }
     """
 
+    # الهيكل الصحيح تماماً لحقل الفيديو في Buffer
     variables = {
         "input": {
             "channelId": channel_id,
             "text": text,
-            "schedulingType": "addToQueue",
-            "assets": {
-                "videos": [video_url]
-            }
+            "schedulingType": "automatic",
+            "mode": "addToQueue",
+            "assets": [
+                {
+                    "video": {
+                        "url": video_url
+                    }
+                }
+            ]
         }
     }
 
     try:
-        response = requests.post(url, headers=headers, json={"query": query, "variables": variables}, timeout=25)
+        response = requests.post(url, headers=headers, json={"query": query, "variables": variables}, timeout=30)
         res_data = response.json()
         
         if "errors" in res_data:
             print(f"❌ خطأ GraphQL للقناة [{channel_id}]: {res_data['errors']}")
         else:
             result = res_data.get("data", {}).get("createPost", {})
-            if "post" in result:
+            if "post" in result and result["post"]:
                 print(f"🚀 تم بنجاح جدولة الفيديو للقناة [{channel_id}] | Post ID: {result['post']['id']}")
             elif "message" in result:
-                print(f"⚠️ تنبيه من Buffer للقناة [{channel_id}]: {result['message']}")
+                print(f"⚠️ استجابة Buffer للقناة [{channel_id}]: {result['message']}")
             else:
                 print(f"✅ استجابة Buffer: {res_data}")
     except Exception as e:
