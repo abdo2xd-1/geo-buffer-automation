@@ -3,44 +3,44 @@ import sys
 import random
 import requests
 
-# 1. جلب المفاتيح من أسرار GitHub وتنظيفها تلقائياً من المسافات
-BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
-PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
+# 1. جلب المفاتيح وتطهيرها برمجياً من أي محارف Unicode غريبة
+RAW_BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
+RAW_PEXELS_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 
-print(f"🔑 Pexels Key Length: {len(PEXELS_API_KEY)}")
-if len(PEXELS_API_KEY) > 8:
-    print(f"🔑 Key Preview: {PEXELS_API_KEY[:4]}...{PEXELS_API_KEY[-4:]}")
+BUFFER_TOKEN = RAW_BUFFER_TOKEN
 
-# 2. إعدادات القنوات والكلمات المفتاحية المخصصة لكل قناة لضمان اختلاف المحتوى
+# تصفية المفتاح ليكون فقط أحرف وأرقام إنجليزية صالحة (ASCII)
+CLEAN_PEXELS_KEY = "".join([c for c in RAW_PEXELS_KEY if ord(c) < 128]).strip()
+
+print(f"🔑 Pexels Raw Key Length: {len(RAW_PEXELS_KEY)}")
+print(f"🔑 Pexels Clean Key Length: {len(CLEAN_PEXELS_KEY)}")
+
+# 2. إعدادات القنوات والكلمات المفتاحية
 CHANNELS = {
     "abaad_geo": {
         "name": "أبعاد جغرافية",
         "id": os.getenv("BUFFER_CHANNEL_ABAAD", "6abace7bea19ca0bde181dff").strip(),
-        "keywords": ["desert landscape", "canyon river", "aerial earth", "mountain range", "geographic map"],
+        "keywords": ["desert landscape aerial", "canyon mountains", "earth geographic nature", "river delta"],
         "hashtags": "#أبعاد_جغرافية #جغرافيا #وثائقي #طبيعة #استكشاف"
     },
     "megabuilds": {
         "name": "مشاريع عملاقة",
         "id": os.getenv("BUFFER_CHANNEL_MEGABUILDS", "6abace11ea19ca0bde181821").strip(),
-        "keywords": ["mega construction", "dam engineering", "futuristic bridge", "skyscraper architecture", "heavy machinery"],
+        "keywords": ["construction engineering", "massive bridge architecture", "skyscraper construction", "heavy machinery"],
         "hashtags": "#مشاريع_عملاقة #هندسة #بناء #تطوير #مستقبل"
     },
     "masar": {
         "name": "مسار",
         "id": os.getenv("BUFFER_CHANNEL_MASAR", "6abacd06ea19ca0bde180ef9").strip(),
-        "keywords": ["cargo port shipping", "global economy trade", "modern metropolis", "energy solar power", "highway transport"],
+        "keywords": ["cargo shipping container port", "modern city highway", "solar power farm", "global trade logistic"],
         "hashtags": "#مسار #اقتصاد #تجارة #تحليل #جيوسياسة"
     }
 }
 
 def get_pexels_4k_video(query, orientation="landscape"):
-    """
-    سحب فيديو بجودة 4K أو أعلى دقة متاحة من Pexels
-    orientation: 'landscape' للفيديوهات الطويلة، 'portrait' للشورتس
-    """
     url = f"https://api.pexels.com/videos/search?query={query}&orientation={orientation}&per_page=15"
     headers = {
-        "Authorization": PEXELS_API_KEY
+        "Authorization": CLEAN_PEXELS_KEY
     }
     
     try:
@@ -55,12 +55,11 @@ def get_pexels_4k_video(query, orientation="landscape"):
             print(f"⚠️ لم يتم العثور على فيديوهات للكلمة: {query}")
             return None
         
-        # اختيار فيديو عشوائي من النتائج لضمان التجديد والتنويع
         chosen_video = random.choice(videos)
         video_files = chosen_video.get("video_files", [])
         
-        # البحث عن جودة 4K (عرض أو ارتفاع لا يقل عن 2160 أو 3840)
         best_file = None
+        # البحث عن أعلى جودة (4K أو UHD)
         for vf in video_files:
             width = vf.get("width", 0)
             height = vf.get("height", 0)
@@ -68,7 +67,6 @@ def get_pexels_4k_video(query, orientation="landscape"):
                 best_file = vf
                 break
         
-        # إذا لم يتوفر ملف 4K صريح، نأخذ أعلى جودة متوفرة (UHD / HD)
         if not best_file and video_files:
             best_file = max(video_files, key=lambda x: (x.get("width", 0) * x.get("height", 0)))
             
@@ -82,7 +80,6 @@ def get_pexels_4k_video(query, orientation="landscape"):
     return None
 
 def publish_to_buffer(channel_id, text, video_url):
-    """جدولة الفيديو على منصة Buffer"""
     url = "https://api.bufferapp.com/1/updates/create.json"
     headers = {
         "Authorization": f"Bearer {BUFFER_TOKEN}",
@@ -92,23 +89,20 @@ def publish_to_buffer(channel_id, text, video_url):
     payload = {
         "profile_ids[]": channel_id,
         "text": text,
-        "now": False,  # للإدراج التلقائي في الجدول (Schedule)
+        "now": False,
         "media[video]": video_url
     }
     
     try:
         response = requests.post(url, headers=headers, data=payload)
         if response.status_code == 200:
-            print(f"🚀 تم بنجاح إرسال التحديث للقناة: {channel_id}")
+            print(f"🚀 تم بنجاح جدولة الفيديو للقناة: {channel_id}")
         else:
-            print(f"❌ فشل الإرسال ({response.status_code}): {response.text}")
+            print(f"❌ فشل الإرسال إلى Buffer ({response.status_code}): {response.text}")
     except Exception as e:
         print(f"❌ استثناء في Buffer: {e}")
 
 def run_job(job_type):
-    """
-    job_type: 'short' للنشر اليومي الرأسي، أو 'long' للنشر الأسبوعي الأفقي
-    """
     is_short = (job_type == "short")
     orientation = "portrait" if is_short else "landscape"
     
@@ -121,9 +115,9 @@ def run_job(job_type):
             continue
             
         if is_short:
-            title = f"شاهد قوة وتفاصيل مذهلة! دقيقة لا تفوتك ⚡\n\n{config['hashtags']} #Shorts #4K"
+            title = f"شاهد روعة المشهد وتفاصيل مذهلة بتقنية 4K ⚡\n\n{config['hashtags']} #Shorts #4K"
         else:
-            title = f"وثائقي حصري بجودة فائقة 4K: تحليل شامل لأهم التطورات العالمية 🌍🎬\n\n{config['hashtags']}"
+            title = f"وثائقي حصري بدقة 4K فائقة: تفاصيل وأسرار حصرية 🌍🎬\n\n{config['hashtags']}"
             
         publish_to_buffer(config["id"], title, video_url)
 
