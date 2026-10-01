@@ -1,14 +1,15 @@
-name: Weekly Long Documentary Publisher (16:9)
+name: Generate 8-Min Long Documentary
 
 on:
-  schedule:
-    - cron: '0 18 * * 5' # يعمل كل جمعة الساعة 6 مساءً
   workflow_dispatch:
+  schedule:
+    # يعمل مرتين أسبوعياً (الأحد والأربعاء الساعة 6 مساءً)
+    - cron: '0 18 * * 0,3'
 
 jobs:
-  publish_long:
+  build_documentary:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       - name: Checkout Code
@@ -18,20 +19,26 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip'
 
-      - name: Install System Dependencies
+      - name: Install FFmpeg & System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-cjk
 
       - name: Install Python Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install moviepy edge-tts requests pillow numpy
 
-      - name: Run Long Video Publisher
+      - name: Produce Long-Form Video
         env:
-          BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
-          BUFFER_CHANNEL_IDS: ${{ secrets.BUFFER_CHANNEL_IDS }}
-        run: python main_publisher.py long
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          python long_documentary_publisher.py
+
+      - name: Upload Video as Artifact (معاينة الفيلم قبل النشر)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Full-8Min-Documentary
+          path: documentary_8min.mp4
+          retention-days: 3
