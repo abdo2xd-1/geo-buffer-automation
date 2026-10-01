@@ -8,7 +8,6 @@ import subprocess
 import requests
 import PIL.Image
 
-# ترقيع التوافق بين Pillow و MoviePy
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     setattr(PIL.Image, 'ANTIALIAS', PIL.Image.Resampling.LANCZOS)
 
@@ -30,118 +29,20 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
 NICHE_NAMES = ["أبعاد جغرافية", "مشاريع عملاقة", "مسار"]
 
-# بنك سيناريوهات احتياطي متكامل للـ 8 دقائق في حال انقطاع الـ API
-FALLBACK_LONG_DOCS = {
-    "أبعاد جغرافية": {
-        "title": "أسرار الممرات المائية الأخطر في تاريخ كوكب الأرض",
-        "desc": "تحقيق وثائقي استقصائي شامل يكشف كواليس أخطر المضائق والممرات الملاحية.\n\n#أبعاد_جغرافية #وثائقي #جغرافيا #مضائق",
-        "chapters": [
-            {
-                "chapter_title": "الفصل الأول: شريان العالم المهدد",
-                "scenes": [
-                    {
-                        "narration": "من آلاف السنين، وخريطة كوكب الأرض بتتحكم فيها ممرات مائية ضيقة جداً، قادرة في ثواني معدودة تعطل حركة الكوكب كله.",
-                        "query": "aerial ocean strait cargo ship",
-                        "lower_third": "📍 مضيق هرمز - الخليج العربي"
-                    },
-                    {
-                        "narration": "المضيق ده بيعبر منه خُمس استهلاك العالم من الطاقة يومياً، يعني أي تهديد أمني صغير هنا معناه شلل مباشر في مصانع ومطارات العالم.",
-                        "query": "oil tanker ocean cinematic drone",
-                        "lower_third": "🛢️ 20% من نفط الكوكب يومياً"
-                    },
-                    {
-                        "narration": "والسؤال اللي شاغل كل أجهزة المخابرات الدولية: إيه السيناريو اللي ممكن يحصل لو ممر زي ده اتقفل تماماً؟",
-                        "query": "military ship naval ocean patrol",
-                        "lower_third": "⚠️ التهديد الاستراتيجي الأخطر"
-                    }
-                ]
-            },
-            {
-                "chapter_title": "الفصل الثاني: معجزة الحفر وتاريخ السويس",
-                "scenes": [
-                    {
-                        "narration": "علشان نفهم حجم الكارثة دي، لازم نرجع بالزمن لنقطة التحول الأكبر في الملاحة البحرية: قناة السويس المصرية.",
-                        "query": "suez canal aerial cargo navigation",
-                        "lower_third": "📍 قناة السويس - مصر"
-                    },
-                    {
-                        "narration": "حفر القناة كان معجزة بشرية دفع فيها مئات الآلاف أرواحهم، علشان يختصروا رحلة الدوران حول قارة إفريقيا بآلاف الأميال.",
-                        "query": "historical desert excavation workers",
-                        "lower_third": "⏳ اختصار 7000 كيلومتر بحري"
-                    },
-                    {
-                        "narration": "لكن هل الطرق البديلة زي طريق رأس الرجاء الصالح ممكن تكون حل عملي في الأزمات؟ الإجابة بتكشف عنها لغة الأرقام والتكاليف.",
-                        "query": "cape of good hope stormy ocean",
-                        "lower_third": "🌊 طريق رأس الرجاء الصالح"
-                    }
-                ]
-            },
-            {
-                "chapter_title": "الفصل الثالث: أزمة إيفر جيفن ولحظة الصدمة",
-                "scenes": [
-                    {
-                        "narration": "في مارس 2021، سفينة حاويات عملاقة بحجم ناطحة سحاب انحرفت عن مسارها، وعلقت في الرمال لتوقف حركة التجارة الدولية تماماً.",
-                        "query": "massive container vessel stuck canal",
-                        "lower_third": "🚨 حادثة جنوح إيفر جيفن"
-                    },
-                    {
-                        "narration": "كل ساعة تأخير كانت بتكلف الاقتصاد العالمي 400 مليون دولار، وطوابير السفن امتدت في البحر الأحمر والبحر المتوسط لأيام طويلة.",
-                        "query": "cargo fleet anchored open sea",
-                        "lower_third": "💸 خسائر: 400 مليون $ كل ساعة"
-                    },
-                    {
-                        "narration": "العالم وقتها أدرك حقيقة مرعبة: سلاسل الإمداد العالمية كلها معلقة على خيط رفيع جداً قابل للقطع في أي لحظة.",
-                        "query": "container port cranes time lapse",
-                        "lower_third": "📦 شلل سلاسل الإمداد العالمية"
-                    }
-                ]
-            },
-            {
-                "chapter_title": "الفصل الرابع: صراع الممرات البديلة والقطب الشمالي",
-                "scenes": [
-                    {
-                        "narration": "ومع ذوبان الجليد في القطب الشمالي، ظهر ممر جديد بيتصارع عليه الكبار: طريق الملاحة الشمالي عبر المياه الروسية.",
-                        "query": "arctic icebreaker ship ice frozen",
-                        "lower_third": "❄️ طريق الملاحة الشمالي - القطب"
-                    },
-                    {
-                        "narration": "روسيا والصين بيستثمروا مليارات الدولارات في كاسحات الجليد النووية، علشان يفتحوا طريق أسرع بين آسيا وأوروبا بعيداً عن نقاط الاختناق التقليدية.",
-                        "query": "nuclear icebreaker drone arctic",
-                        "lower_third": "🚢 أسطول كاسحات الجليد النووية"
-                    },
-                    {
-                        "narration": "لكن المخاطر المناخية والتكاليف اللوجستية الضخمة لسه بتخلي الممر ده تحدي هندسي وجغرافي معقد جداً.",
-                        "query": "glaciers melting arctic cold ocean",
-                        "lower_third": "🧭 تحديات البيئة واللوجستيات"
-                    }
-                ]
-            },
-            {
-                "chapter_title": "الفصل الخامس: صراع المستقبل والكلمة الأخيرة",
-                "scenes": [
-                    {
-                        "narration": "الصراع في القرن الحادي والعشرين مش مجرد صراع على الأراضي، ده صراع على التحكم في الشرايين اللي بتغذي العالم بكل احتياجاته.",
-                        "query": "world map satellite digital network",
-                        "lower_third": "🌐 خريطة التجارة للقرن 21"
-                    },
-                    {
-                        "narration": "من هرمز لباب المندب لقناة بنما، كل نقطة مائية على الكوكب أصبحت ساحة شطرنج تديرها القوى العظمى بكل حذر.",
-                        "query": "panama canal locks ship crossing",
-                        "lower_third": "📍 قناة بنما - المحيط الهادئ"
-                    },
-                    {
-                        "narration": "تفتكروا إيه الممر المائي اللي ممكن يشهد الأزمة القادمة؟ اكتبوا لنا رأيكم في التعليقات واشتركوا في القناة لمتابعة تحقيقاتنا القادمة.",
-                        "query": "cinematic sunset ocean horizon drone",
-                        "lower_third": "💬 شاركنا رأيك في التعليقات"
-                    }
-                ]
-            }
-        ]
-    }
-}
+# موسيقى وثائقية سينمائية محيطية طويلة
+DOC_BGM_URL = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=dark-mystery-trailer-111586.mp3"
 
-# 2. إعداد الخط العربي
-def get_best_arabic_font(size=44):
+def ensure_bgm():
+    if not os.path.exists("doc_bgm.mp3"):
+        try:
+            r = requests.get(DOC_BGM_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=25)
+            if r.status_code == 200:
+                with open("doc_bgm.mp3", "wb") as f:
+                    f.write(r.content)
+        except Exception as e:
+            print(f"⚠️ تعذر تنزيل الموسيقى: {e}")
+
+def get_best_arabic_font(size=42):
     for p in [
         "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf",
         "/usr/share/fonts/truetype/noto/NotoKufiArabic-Bold.ttf",
@@ -155,107 +56,78 @@ def get_best_arabic_font(size=44):
 def clean_arabic(text):
     return re.sub(r'[^\w\s\d\u0600-\u06FF!؟,\.\:\-\(\)\"\$]+', '', text).strip()
 
-# 3. محرك الاستدعاء الذكي للنماذج المتاحة من Gemini
-def find_working_gemini_model():
-    """البحث في حساب المستخدم عن اسم الموديل النشط تلقائياً"""
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
-        res = requests.get(url, timeout=10)
-        if res.status_code == 200:
-            models_list = res.json().get("models", [])
-            for m in models_list:
-                m_name = m.get("name", "")
-                supported = m.get("supportedGenerationMethods", [])
-                if "generateContent" in supported:
-                    # تفضيل موديلات الفلاش السريعة
-                    if "flash" in m_name:
-                        return m_name.replace("models/", "")
-            # إذا لم نجد فلاش، نأخذ أول نموذج يدعم توليد المحتوى
-            for m in models_list:
-                if "generateContent" in m.get("supportedGenerationMethods", []):
-                    return m.get("name", "").replace("models/", "")
-    except Exception as e:
-        print(f"⚠️ تعذر فحص قائمة الموديلات: {e}")
-    return "gemini-1.5-flash-latest"
+def call_gemini_raw(prompt):
+    """استدعاء Gemini مع التبديل التلقائي بين النماذج النشطة"""
+    candidate_models = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+    for model in candidate_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            res = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=60)
+            if res.status_code == 200:
+                txt = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                txt = txt.strip().replace("```json", "").replace("```", "")
+                return txt
+        except Exception:
+            continue
+    raise Exception("فشلت جميع نماذج Gemini في الاستجابة.")
 
-def generate_8min_documentary(niche_name):
-    if not GEMINI_API_KEY:
-        print("⚠️ مفتاح GEMINI_API_KEY غير موجود، استخدام السكربت الاحتياطي.")
-        return FALLBACK_LONG_DOCS.get(niche_name, FALLBACK_LONG_DOCS["أبعاد جغرافية"])
-
-    chosen_model = find_working_gemini_model()
-    print(f"🤖 الموديل المعتمد للتوليد: {chosen_model}")
-
+# 2. توليد المخطط العام للوثائقي الكبير (6 فصول كبرى)
+def generate_documentary_outline(niche_name):
+    print("🧠 جاري بناء المخطط الاستقصائي للفيلم الوثائقي الكبير (30 دقيقة)...")
     prompt = f"""
-أنت مخرج ومحقق وثائقي محترف تصنع أفلاماً استقصائية مشوقة بالعامية المصرية بأسلوب "غابرييل عماد" و "Vox".
-المجال المستهدف: {niche_name}.
-المطلوب: إنتاج سيناريو فيلم وثائقي استقصائي متكامل مدته 8 دقائق (حوالي 1100 كلمة).
+أنت مخرج ومحقق وثائقي محترف مثل غابرييل عماد و Vox.
+المجال: {niche_name}.
+المطلوب: بناء مخطط لفيلم وثائقي مطول وشديد الإثارة والعمق مدته 30 دقيقة.
+قسّم الفيلم إلى 6 فصول محورية كبرى تعالج القضية من جذورها التاريخية والسياسية والاقتصادية والمستقبلية.
 
-قسّم الفيلم إلى 5 فصول رئيسية:
-- الفصل 1: اللغز والكارثة الافتتاحية (The Mystery Hook).
-- الفصل 2: البعد الجغرافي والجذور التاريخية (Geopolitical Context).
-- الفصل 3: صلب المعركة والأرقام الخارقة (The Core Conflict / Engineering Feat).
-- الفصل 4: مليارات الدولارات وسلاسل الإمداد (Economic Fallout).
-- الفصل 5: الخاتمة وسؤال المستقبل المفتوح (The Conclusion & Debate).
-
-في كل فصل، ضع 3 مشاهد تفصيلية. في كل مشهد اكتب:
-- "narration": نص سردي مشوق وطويل نسبياً بالعامية المصرية الراقية (حوالي 70 إلى 80 كلمة لكل مشهد).
-- "query": كلمة بحث سينمائية بالإنجليزية لجلب لقطات عريضة من Pexels (Landscape).
-- "lower_third": عنوان توثيقي يظهر أسفل الشاشة (مثل: "📍 مضيق هرمز - الخليج العربي").
-
-أخرج النتيجة بتنسيق JSON خالص وبدون أي علامات Markdown:
+أخرج النتيجة بصيغة JSON حصراً:
 {{
-  "title": "عنوان وثائقي ناري وجذاب جداً",
-  "desc": "وصف مفصل للوثائقي مع روابط الفصول والهاشتاجات",
+  "title": "عنوان وثائقي ملحمي يثير الفضول",
+  "desc": "وصف كامل ومفصل للوثائقي مع الهاشتاجات وروابط الفصول",
   "chapters": [
+    {{"chapter_idx": 1, "title": "عنوان الفصل 1: اللغز ونقطة الصفر"}},
+    {{"chapter_idx": 2, "title": "عنوان الفصل 2: الجذور الجيوسياسية والتاريخية"}},
+    {{"chapter_idx": 3, "title": "عنوان الفصل 3: كواليس المعركة والأرقام الخارقة"}},
+    {{"chapter_idx": 4, "title": "عنوان الفصل 4: حركة الأموال وتريليونات سلاسل الإمداد"}},
+    {{"chapter_idx": 5, "title": "عنوان الفصل 5: الصراع الاستخباراتي والدولي المعاصر"}},
+    {{"chapter_idx": 6, "title": "عنوان الفصل 6: سيناريوهات المستقبل والكلمة الأخيرة"}}
+  ]
+}}
+    """
+    txt = call_gemini_raw(prompt)
+    return json.loads(txt)
+
+# 3. توليد نصوص المشاهد المتعمقة لكل فصل (بمعدل 4 إلى 5 مشاهد دسمة)
+def generate_chapter_deep_scenes(niche_name, doc_title, chapter_info):
+    print(f"✍️ كتابة السرد الموسع للفصل: {chapter_info['title']}")
+    prompt = f"""
+أنت محقق وثائقي بارع. الفيلم بعنوان: "{doc_title}" في مجال "{niche_name}".
+الفصل المطلوب كتابته بالتفصيل: "{chapter_info['title']}".
+المطلوب: كتابة 5 مشاهد وثائقية متتالية ومتصلة لهذا الفصل.
+لكل مشهد، اكتب فقرة سردية طويلة ودسمة بالعامية المصرية الراقية والمشوقة (حوالي 85 إلى 110 كلمة لكل مشهد) تسرد تفاصيل وحقائق وأرقام عميقة دون استعجال.
+
+أخرج النتيجة بصيغة JSON حصراً:
+{{
+  "scenes": [
     {{
-      "chapter_title": "عنوان الفصل الأول",
-      "scenes": [
-        {{
-          "narration": "النص السردي الكامل بالعامية المصرية...",
-          "query": "cinematic landscape cargo ship aerial 4k",
-          "lower_third": "📍 بورسعيد - مدخل قناة السويس"
-        }}
-      ]
+      "narration": "نص سردي وثائقي مفصل وطويل بالعامية المصرية يشرح الأحداث بدقة...",
+      "query": "cinematic landscape 4k detailed stock footage english query",
+      "lower_third": "📍 الموقع أو التوثيق الرقمي المعروض"
     }}
   ]
 }}
     """
-
-    # تجربة الموديل المكتشف ثم النماذج الشائعة تباعاً
-    candidate_urls = [
-        f"https://generativelanguage.googleapis.com/v1beta/models/{chosen_model}:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
-    ]
-
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-
-    for endpoint in candidate_urls:
-        try:
-            res = requests.post(endpoint, json=payload, timeout=45)
-            if res.status_code == 200:
-                raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                raw_text = raw_text.strip().replace("```json", "").replace("```", "")
-                data = json.loads(raw_text)
-                if "chapters" in data and len(data["chapters"]) >= 4:
-                    print(f"✅ تم توليد السيناريو بنجاح عبر: {endpoint.split('models/')[1].split(':')[0]}")
-                    return data
-        except Exception:
-            continue
-
-    print("⚠️ تعذر استجابة نماذج Gemini، سيتم استخدام السكربت الاحتياطي عالي الجودة.")
-    return FALLBACK_LONG_DOCS.get(niche_name, FALLBACK_LONG_DOCS["أبعاد جغرافية"])
+    txt = call_gemini_raw(prompt)
+    return json.loads(txt).get("scenes", [])
 
 # 4. التوليد الصوتي
 async def generate_voice(text, output_file):
     import edge_tts
-    communicate = edge_tts.Communicate(text, "ar-EG-ShakirNeural", rate="+6%")
+    # وتيرة متزنة ومناسبة للأفلام الطويلة
+    communicate = edge_tts.Communicate(text, "ar-EG-ShakirNeural", rate="+4%")
     await communicate.save(output_file)
 
-# 5. سحب لقطات أفقية (Landscape 16:9)
+# 5. جلب الفيديو الأفقي 16:9
 def fetch_landscape_video(query, target_filename):
     if PEXELS_API_KEY:
         try:
@@ -281,15 +153,15 @@ def fetch_landscape_video(query, target_filename):
                                 for chunk in v_resp.iter_content(chunk_size=1024*1024):
                                     if chunk: f.write(chunk)
                             return True
-        except Exception as e:
-            print(f"⚠️ خطأ في سحب لقطة {query}: {e}")
+        except Exception:
+            pass
     return False
 
-# 6. تصميم لوحة التعريف السفلية (Lower-Third 16:9)
+# 6. لوحة التعريف السفلية (Lower-Third 16:9)
 def create_lower_third(text, target_path, size=(1920, 1080)):
     img = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    font = get_best_arabic_font(size=36)
+    font = get_best_arabic_font(size=34)
 
     clean_txt = clean_arabic(text)
     has_raqm = features.check("raqm")
@@ -310,21 +182,21 @@ def create_lower_third(text, target_path, size=(1920, 1080)):
     draw.text(((bx1 + bx2) // 2, by1 + 10), clean_txt, font=font, fill=(255, 255, 255, 255), anchor="mt", direction="rtl" if has_raqm else None)
     img.save(target_path)
 
-# 7. بناء ريندر الفصل وتصديره
-def render_chapter_chunk(chapter_data, chapter_idx):
+# 7. رندر الفصل الواحد كملف مستقل (Chunk)
+def render_chapter_chunk(scenes_list, chapter_title, chapter_idx):
     size = (1920, 1080)
     scenes = []
     temp_files = []
     voice_clips = []
     current_time = 0.0
 
-    print(f"\n🎬 معالجة الفصل {chapter_idx + 1}: {chapter_data['chapter_title']}")
+    print(f"\n🎬 معالجة وتصدير الفصل {chapter_idx} ({len(scenes_list)} مشاهد موسعة)...")
 
-    for s_idx, sc in enumerate(chapter_data["scenes"]):
+    for s_idx, sc in enumerate(scenes_list):
         aud_path = f"aud_c{chapter_idx}_s{s_idx}.mp3"
         asyncio.run(generate_voice(sc["narration"], aud_path))
         aud_clip = AudioFileClip(aud_path)
-        duration = aud_clip.duration + 0.3
+        duration = aud_clip.duration + 0.35
         temp_files.append(aud_path)
 
         voice_clips.append(aud_clip.set_start(current_time))
@@ -347,9 +219,9 @@ def render_chapter_chunk(chapter_data, chapter_idx):
             clip = ColorClip(size=size, color=(15, 23, 42)).set_duration(duration)
 
         lt_path = f"lt_c{chapter_idx}_s{s_idx}.png"
-        create_lower_third(sc.get("lower_third", "وثائقي استقصائي"), lt_path, size=size)
+        create_lower_third(sc.get("lower_third", chapter_title), lt_path, size=size)
         temp_files.append(lt_path)
-        lt_clip = ImageClip(lt_path).set_duration(min(4.0, duration)).set_start(0.5)
+        lt_clip = ImageClip(lt_path).set_duration(min(5.0, duration)).set_start(0.5)
 
         composed_scene = CompositeVideoClip([clip, lt_clip], size=size).set_duration(duration)
         scenes.append(composed_scene)
@@ -365,7 +237,7 @@ def render_chapter_chunk(chapter_data, chapter_idx):
         fps=24,
         codec="libx264",
         audio_codec="aac",
-        bitrate="4000k",
+        bitrate="3500k",
         preset="ultrafast",
         threads=2
     )
@@ -377,21 +249,41 @@ def render_chapter_chunk(chapter_data, chapter_idx):
 
     return chunk_filename
 
-# 8. دمج الفصول بـ FFmpeg
-def stitch_chapters_with_ffmpeg(chunk_files, output_filename="documentary_8min.mp4"):
-    print("\n⚡ بدء الدمج الفوري للفصول عبر FFmpeg Concat...")
+# 8. دمج الفصول وإضافة تراك الموسيقى التصويرية الممتد
+def stitch_and_finalize_documentary(chunk_files, output_filename="documentary_30min.mp4"):
+    print("\n⚡ بدء الدمج الفوري لجميع الفصول عبر FFmpeg...")
     list_path = "chapters_list.txt"
     with open(list_path, "w", encoding="utf-8") as f:
         for chunk in chunk_files:
             f.write(f"file '{chunk}'\n")
 
-    cmd = [
+    temp_stitched = "temp_raw_stitched.mp4"
+    cmd_concat = [
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
         "-i", list_path,
         "-c", "copy",
-        output_filename
+        temp_stitched
     ]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd_concat, check=True)
+
+    # دمج الموسيقى التصويرية المحيطية الهادئة تحت الفيديو بالكامل
+    ensure_bgm()
+    if os.path.exists("doc_bgm.mp3"):
+        print("🎵 دمج الموسيقى التصويرية الوثائقية بكامل مدة الفيلم...")
+        cmd_audio = [
+            "ffmpeg", "-y",
+            "-i", temp_stitched,
+            "-stream_loop", "-1", "-i", "doc_bgm.mp3",
+            "-filter_complex", "[1:a]volume=0.08[bgm];[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=3[aout]",
+            "-map", "0:v", "-map", "[aout]",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+            output_filename
+        ]
+        subprocess.run(cmd_audio, check=True)
+        if os.path.exists(temp_stitched):
+            os.remove(temp_stitched)
+    else:
+        os.rename(temp_stitched, output_filename)
 
     if os.path.exists(list_path):
         os.remove(list_path)
@@ -399,30 +291,30 @@ def stitch_chapters_with_ffmpeg(chunk_files, output_filename="documentary_8min.m
         if os.path.exists(chunk):
             os.remove(chunk)
 
-    print(f"🎉 تم إنتاج الفيلم الوثائقي الكامل بنجاح: {output_filename}")
+    print(f"🎉 تم بنجاح إنتاج الفيلم الوثائقي الطويل: {output_filename}")
     return output_filename
 
-# 9. نقطة التشغيل الرئيسية
 def main():
-    niche_name = NICHE_NAMES[0]
+    niche_name = NICHE_NAMES[0] # البدء بـ "أبعاد جغرافية"
     print(f"=======================================================")
-    print(f"🚀 بدء إنتاج فيلم وثائقي طويل (8 دقائق): {niche_name}")
+    print(f"🚀 بدء إنتاج فيلم وثائقي ضخم (25 - 30 دقيقة): {niche_name}")
     print(f"=======================================================")
 
-    doc_data = generate_8min_documentary(niche_name)
-    print(f"📌 عنوان الوثائقي: {doc_data['title']}")
+    doc_outline = generate_documentary_outline(niche_name)
+    print(f"📌 عنوان الوثائقي: {doc_outline['title']}")
 
     chunk_files = []
-    for idx, chapter in enumerate(doc_data["chapters"]):
-        chunk_path = render_chapter_chunk(chapter, idx)
-        chunk_files.append(chunk_path)
+    for ch in doc_outline["chapters"]:
+        scenes = generate_chapter_deep_scenes(niche_name, doc_outline["title"], ch)
+        chunk_file = render_chapter_chunk(scenes, ch["title"], ch["chapter_idx"])
+        chunk_files.append(chunk_file)
 
-    final_video_path = stitch_chapters_with_ffmpeg(chunk_files, "documentary_8min.mp4")
+    final_video_path = stitch_and_finalize_documentary(chunk_files, "documentary_30min.mp4")
 
     with open("video_metadata.json", "w", encoding="utf-8") as f:
         json.dump({
-            "title": doc_data["title"],
-            "desc": doc_data["desc"]
+            "title": doc_outline["title"],
+            "desc": doc_outline["desc"]
         }, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
