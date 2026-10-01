@@ -31,7 +31,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 NICHE_NAMES = ["أبعاد جغرافية", "مشاريع عملاقة", "مسار"]
 
 # موسيقى وثائقية سينمائية محيطية طويلة
-DOC_BGM_URL = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=dark-mystery-trailer-111586.mp3"
+DOC_BGM_URL = "[https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=dark-mystery-trailer-111586.mp3](https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=dark-mystery-trailer-111586.mp3)"
 
 # ==============================================================================
 # بنك السيناريو الموسع الكامل (30 دقيقة - 6 فصول كبرى و 30 مشهداً دسمة)
@@ -265,9 +265,273 @@ def call_gemini_safe(prompt):
         ("v1beta", "gemini-pro")
     ]
     for ver, mod in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/{ver}/models/{mod}:generateContent?key={GEMINI_API_KEY}"
+        url = f"[https://generativelanguage.googleapis.com/](https://generativelanguage.googleapis.com/){ver}/models/{mod}:generateContent?key={GEMINI_API_KEY}"
         try:
             res = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
             if res.status_code == 200:
                 txt = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return txt.strip().replace("```json", "").replace("
+                clean_txt = txt.strip()
+                clean_txt = clean_txt.replace("```json", "").replace("```", "")
+                return clean_txt.strip()
+            else:
+                print(f"⚠️ فحص {mod} على {ver} أعاد كود: {res.status_code}")
+        except Exception:
+            continue
+    return None
+
+def get_documentary_outline(niche_name):
+    print("🧠 جاري تحضير المخطط الاستقصائي للوثائقي الكبير (30 دقيقة)...")
+    prompt = f"""
+أنت مخرج ومحقق وثائقي محترف. المطلوب هيكل فيلم وثائقي 30 دقيقة لمجال: {niche_name}.
+قسّم الفيلم إلى 6 فصول رئيسية في صيغة JSON فقط:
+{{
+  "title": "عنوان وثائقي ملحمي",
+  "desc": "وصف مفصل للوثائقي",
+  "chapters": [
+    {{"chapter_idx": 1, "title": "عنوان الفصل الأول"}},
+    {{"chapter_idx": 2, "title": "عنوان الفصل الثاني"}},
+    {{"chapter_idx": 3, "title": "عنوان الفصل الثالث"}},
+    {{"chapter_idx": 4, "title": "عنوان الفصل الرابع"}},
+    {{"chapter_idx": 5, "title": "عنوان الفصل الخامس"}},
+    {{"chapter_idx": 6, "title": "عنوان الفصل السادس"}}
+  ]
+}}
+    """
+    raw_res = call_gemini_safe(prompt)
+    if raw_res:
+        try:
+            data = json.loads(raw_res)
+            if "chapters" in data and len(data["chapters"]) >= 5:
+                print("✅ تم بنجاح استلام المخطط المولد من Gemini.")
+                return data
+        except Exception:
+            pass
+
+    print("🛡️ سيتم الاعتماد مباشرة على السيناريو الموسع المتكامل عالي الجودة.")
+    return MASTER_30MIN_FALLBACK
+
+def get_chapter_scenes(niche_name, doc_title, chapter_info, chapter_idx):
+    prompt = f"""
+أنت محقق وثائقي. الفيلم: "{doc_title}". الفصل: "{chapter_info['title']}".
+اكتب 5 مشاهد مفصلة بالعامية المصرية الراقية (80 إلى 100 كلمة لكل مشهد).
+JSON فقط:
+{{
+  "scenes": [
+    {{
+      "narration": "النص السردي المفصل...",
+      "query": "cinematic 4k landscape stock footage english",
+      "lower_third": "📍 الموقع أو التوثيق"
+    }}
+  ]
+}}
+    """
+    raw_res = call_gemini_safe(prompt)
+    if raw_res:
+        try:
+            data = json.loads(raw_res)
+            if "scenes" in data and len(data["scenes"]) >= 3:
+                return data["scenes"]
+        except Exception:
+            pass
+
+    fallback_chapters = MASTER_30MIN_FALLBACK["chapters"]
+    fallback_ch = fallback_chapters[(chapter_idx - 1) % len(fallback_chapters)]
+    return fallback_ch["scenes"]
+
+# 2. التوليد الصوتي
+async def generate_voice(text, output_file):
+    import edge_tts
+    communicate = edge_tts.Communicate(text, "ar-EG-ShakirNeural", rate="+4%")
+    await communicate.save(output_file)
+
+# 3. جلب مقاطع الفيديو العريضة
+def fetch_landscape_video(query, target_filename):
+    if PEXELS_API_KEY:
+        try:
+            url = f"[https://api.pexels.com/videos/search?query=](https://api.pexels.com/videos/search?query=){query}&per_page=5&orientation=landscape"
+            headers = {"Authorization": PEXELS_API_KEY, "User-Agent": "Mozilla/5.0"}
+            r = requests.get(url, headers=headers, timeout=20)
+            if r.status_code == 200:
+                vids = r.json().get("videos", [])
+                if vids:
+                    video_files = vids[0].get("video_files", [])
+                    selected_link = None
+                    for vf in video_files:
+                        if vf.get("width") == 1920 and vf.get("height") == 1080:
+                            selected_link = vf.get("link")
+                            break
+                    if not selected_link and video_files:
+                        selected_link = video_files[0].get("link")
+
+                    if selected_link:
+                        v_resp = requests.get(selected_link, stream=True, timeout=40)
+                        if v_resp.status_code == 200:
+                            with open(target_filename, "wb") as f:
+                                for chunk in v_resp.iter_content(chunk_size=1024*1024):
+                                    if chunk: f.write(chunk)
+                            return True
+        except Exception:
+            pass
+    return False
+
+# 4. لوحة التعريف السفلية (Lower-Third 16:9)
+def create_lower_third(text, target_path, size=(1920, 1080)):
+    img = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    font = get_best_arabic_font(size=34)
+
+    clean_txt = clean_arabic(text)
+    has_raqm = features.check("raqm")
+    if not has_raqm:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        clean_txt = get_display(arabic_reshaper.reshape(clean_txt))
+
+    bbox = draw.textbbox((0, 0), clean_txt, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+    bx2 = 1920 - 100
+    bx1 = bx2 - tw - 50
+    by1 = 1080 - 180
+    by2 = by1 + th + 24
+
+    draw.rounded_rectangle([bx1, by1, bx2, by2], radius=14, fill=(10, 15, 25, 220), outline=(0, 230, 255, 200), width=2)
+    draw.text(((bx1 + bx2) // 2, by1 + 10), clean_txt, font=font, fill=(255, 255, 255, 255), anchor="mt", direction="rtl" if has_raqm else None)
+    img.save(target_path)
+
+# 5. بناء رندر الفصل الواحد كملف مستقل (Chunk)
+def render_chapter_chunk(scenes_list, chapter_title, chapter_idx):
+    size = (1920, 1080)
+    scenes = []
+    temp_files = []
+    voice_clips = []
+    current_time = 0.0
+
+    print(f"\n🎬 معالجة وتصدير الفصل {chapter_idx}: {chapter_title} ({len(scenes_list)} مشاهد)...")
+
+    for s_idx, sc in enumerate(scenes_list):
+        aud_path = f"aud_c{chapter_idx}_s{s_idx}.mp3"
+        asyncio.run(generate_voice(sc["narration"], aud_path))
+        aud_clip = AudioFileClip(aud_path)
+        duration = aud_clip.duration + 0.35
+        temp_files.append(aud_path)
+
+        voice_clips.append(aud_clip.set_start(current_time))
+
+        vid_path = f"vid_c{chapter_idx}_s{s_idx}.mp4"
+        success = fetch_landscape_video(sc["query"], vid_path)
+
+        if success:
+            try:
+                clip = VideoFileClip(vid_path).without_audio()
+                if clip.duration < duration:
+                    clip = clip.fx(vfx.loop, duration=duration)
+                else:
+                    clip = clip.subclip(0, duration)
+                clip = clip.resize(size)
+                temp_files.append(vid_path)
+            except Exception:
+                clip = ColorClip(size=size, color=(15, 23, 42)).set_duration(duration)
+        else:
+            clip = ColorClip(size=size, color=(15, 23, 42)).set_duration(duration)
+
+        lt_path = f"lt_c{chapter_idx}_s{s_idx}.png"
+        create_lower_third(sc.get("lower_third", chapter_title), lt_path, size=size)
+        temp_files.append(lt_path)
+        lt_clip = ImageClip(lt_path).set_duration(min(5.0, duration)).set_start(0.5)
+
+        composed_scene = CompositeVideoClip([clip, lt_clip], size=size).set_duration(duration)
+        scenes.append(composed_scene)
+        current_time += duration
+
+    chapter_video = concatenate_videoclips(scenes, method="compose")
+    chapter_audio = CompositeAudioClip(voice_clips).set_duration(chapter_video.duration)
+    chapter_video = chapter_video.set_audio(chapter_audio)
+
+    chunk_filename = f"chunk_chapter_{chapter_idx}.mp4"
+    chapter_video.write_videofile(
+        chunk_filename,
+        fps=24,
+        codec="libx264",
+        audio_codec="aac",
+        bitrate="3500k",
+        preset="ultrafast",
+        threads=2
+    )
+
+    for f in temp_files:
+        if os.path.exists(f):
+            try: os.remove(f)
+            except: pass
+
+    return chunk_filename
+
+# 6. دمج الفصول وإضافة الموسيقى التصويرية الممتدة عبر FFmpeg
+def stitch_and_finalize_documentary(chunk_files, output_filename="documentary_30min.mp4"):
+    print("\n⚡ بدء الدمج الفوري لجميع الفصول عبر FFmpeg Concat...")
+    list_path = "chapters_list.txt"
+    with open(list_path, "w", encoding="utf-8") as f:
+        for chunk in chunk_files:
+            f.write(f"file '{chunk}'\n")
+
+    temp_stitched = "temp_raw_stitched.mp4"
+    cmd_concat = [
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+        "-i", list_path,
+        "-c", "copy",
+        temp_stitched
+    ]
+    subprocess.run(cmd_concat, check=True)
+
+    ensure_bgm()
+    if os.path.exists("doc_bgm.mp3"):
+        print("🎵 دمج الموسيقى التصويرية الوثائقية بكامل مدة الفيلم...")
+        cmd_audio = [
+            "ffmpeg", "-y",
+            "-i", temp_stitched,
+            "-stream_loop", "-1", "-i", "doc_bgm.mp3",
+            "-filter_complex", "[1:a]volume=0.08[bgm];[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=3[aout]",
+            "-map", "0:v", "-map", "[aout]",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+            output_filename
+        ]
+        subprocess.run(cmd_audio, check=True)
+        if os.path.exists(temp_stitched):
+            os.remove(temp_stitched)
+    else:
+        os.rename(temp_stitched, output_filename)
+
+    if os.path.exists(list_path):
+        os.remove(list_path)
+    for chunk in chunk_files:
+        if os.path.exists(chunk):
+            os.remove(chunk)
+
+    print(f"🎉 تم بنجاح إنتاج الفيلم الوثائقي الطويل: {output_filename}")
+    return output_filename
+
+def main():
+    niche_name = NICHE_NAMES[0]
+    print(f"=======================================================")
+    print(f"🚀 بدء إنتاج فيلم وثائقي ضخم (25 - 30 دقيقة): {niche_name}")
+    print(f"=======================================================")
+
+    doc_outline = get_documentary_outline(niche_name)
+    print(f"📌 عنوان الوثائقي: {doc_outline['title']}")
+
+    chunk_files = []
+    for ch in doc_outline["chapters"]:
+        scenes = get_chapter_scenes(niche_name, doc_outline["title"], ch, ch["chapter_idx"])
+        chunk_file = render_chapter_chunk(scenes, ch["title"], ch["chapter_idx"])
+        chunk_files.append(chunk_file)
+
+    final_video_path = stitch_and_finalize_documentary(chunk_files, "documentary_30min.mp4")
+
+    with open("video_metadata.json", "w", encoding="utf-8") as f:
+        json.dump({
+            "title": doc_outline["title"],
+            "desc": doc_outline["desc"]
+        }, f, ensure_ascii=False, indent=2)
+
+if __name__ == "__main__":
+    main()
