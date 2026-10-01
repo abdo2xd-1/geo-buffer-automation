@@ -1,6 +1,7 @@
-requests
-moviepy==1.0.3
-edge-tts
-pillow<10.0.0
-arabic-reshaper
-python-bidi
+from moviepy import (
+    VideoFileClip,
+    AudioFileClip,
+    TextClip,
+    CompositeVideoClip,
+    concatenate_videoclips,
+)
