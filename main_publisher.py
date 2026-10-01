@@ -3,6 +3,7 @@ import sys
 import random
 import asyncio
 import io
+import json
 import requests
 
 # ترقيع توافق moviepy مع مكتبة Pillow
@@ -24,6 +25,7 @@ from moviepy.editor import (
 # 1. المفاتيح والقنوات
 BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
 DEFAULT_CHANNELS = [
     "6abacd06ea19ca0bde180ef9", # أبعاد جغرافية
@@ -38,126 +40,123 @@ if env_channel_str:
 else:
     CHANNELS_LIST = DEFAULT_CHANNELS
 
-# 2. بنك المشاهد بأسلوب غابرييل عماد
-CHANNELS_CONTENT = {
-    # 🌍 القناة الأولى: أبعاد جغرافية
-    "أبعاد جغرافية": {
-        "title": "معلومات جغرافية صادمة ومخيفة عن كوكب الأرض !!😱⚡",
-        "desc": "أغرب الحقائق الجغرافية التي لم تسمع بها من قبل عن كوكب الأرض! اكتب سبحان الله واشترك للمزيد 🌍⚡\n\n#أبعاد_جغرافية #حقائق_مرعبة #غرائب #هل_تعلم #Shorts #explore",
-        "scenes": [
-            {
-                "hook": "أنت تعرف إن في روسيا فرق التوقيت بيوصل لإحدى عشرة ساعة بين طرفي البلد؟",
-                "display": ["أنت تعرف إن روسيا فيها", "11 منطقة زمنية مختلفة", "في نفس اللحظة؟!"],
-                "query": "snow forest drone",
-                "img_backup": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "وجبل إفرست الأعلى في العالم، بينمو أربعة مليمترات زيادة كل سنة بسبب حركة الأرض!",
-                "display": ["وجبل إفرست كل سنة", "بينمو 4 مليمترات زيادة", "بفعل حركة الصفائح!"],
-                "query": "mountain clouds aerial",
-                "img_backup": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "وفي القارة القطبية الجنوبية، ما سقطش عليها نقطة مطر واحدة من أكتر من مليوني سنة!",
-                "display": ["والقارة القطبية الجنوبية", "ما نزلش عليها مطر", "من مليوني سنة!"],
-                "query": "ice glacier arctic",
-                "img_backup": "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "وفي شمال النرويج، الشمس بتفضل ساطعة وما بتغربش نهائياً طوال فصل الصيف!",
-                "display": ["وفي شمال النرويج", "الشمس ما بتغربش أبداً", "طوال الصيف!"],
-                "query": "sunset landscape northern",
-                "img_backup": "https://images.unsplash.com/photo-1507272931001-fc06c17e4f43?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "ما تنساش تكتب سبحان الله في التعليقات وتشترك في القناة وتعمل لايك!",
-                "display": ["اكتب سبحان الله في التعليقات", "واشترك في القناة حالا!", "واعمل لايك للفيديو"],
-                "query": "planet earth space",
-                "img_backup": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1080&h=1920&fit=crop"
-            }
-        ]
-    },
+NICHE_NAMES = ["أبعاد جغرافية", "مشاريع عملاقة", "مسار"]
 
-    # 🏗️ القناة الثانية: مشاريع عملاقة
-    "مشاريع عملاقة": {
-        "title": "أضخم مشاريع في تاريخ البشرية غيرت دوران الأرض !!😱🏗️",
-        "desc": "إنجازات هندسية خارقة ومعلومات مرعبة عن سدود وناطحات العالم! اكتب سبحان الله واشترك 🏗️⚡\n\n#مشاريع_عملاقة #هندسة #بناء #ناطحات_سحاب #غرائب #Shorts",
-        "scenes": [
-            {
-                "hook": "أنت تعرف إن سد الممرات الثلاثة في الصين، من ضخامته، أبطأ حركة دوران كوكب الأرض؟",
-                "display": ["سد الممرات في الصين", "أبطأ دوران الأرض بالكامل", "بسبب ضخامة وزنه!"],
-                "query": "water dam reservoir",
-                "img_backup": "https://images.unsplash.com/photo-1541888946425-d0fbb186c5f7?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "وبرج خليفة في دبي، وزنه بيعادل مئة ألف فيل ضخم ومصنوع من خرسانة جبارة!",
-                "display": ["وبرج خليفة في دبي", "وزنه بيعادل وزن", "100 ألف فيل!"],
-                "query": "dubai skyline skyscraper",
-                "img_backup": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "ونفق المانش بيسمح للقطارات تمر تحت قاع البحر بين بريطانيا وفرنسا في ظلام دامس!",
-                "display": ["ونفق المانش بيمر", "تحت قاع المحيط تماماً", "بين فرنسا وبريطانيا!"],
-                "query": "train speed tunnel",
-                "img_backup": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "وأطول جسر على وجه الأرض بيمتد لأكتر من مئة وأربعة وستين كيلومتراً بدون توقف!",
-                "display": ["وأطول جسر في العالم", "طوله 164 كيلومتر", "في قلب الصين!"],
-                "query": "highway bridge drone",
-                "img_backup": "https://images.unsplash.com/photo-1545558014-8692077e9b5c?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "ما تنساش تكتب سبحان الله وتشترك في القناة وتعمل لايك!",
-                "display": ["اكتب سبحان الله في التعليقات", "واشترك في القناة حالا!", "واعمل لايك للفيديو"],
-                "query": "construction building site",
-                "img_backup": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1080&h=1920&fit=crop"
-            }
-        ]
-    },
+# 2. بنك المواضيع الموسع (30+ موضوع حصري يضمن التنوع الكامل يومياً)
+FALLBACK_TOPICS_POOL = {
+    "أبعاد جغرافية": [
+        {
+            "title": "أغرب بحيرة على كوكب الأرض تحول الحيوانات إلى حجارة !!😱⚡",
+            "desc": "حقائق مرعبة عن بحيرة النطرون وظواهر طبيعية غامضة! اكتب سبحان الله واشترك 🌍⚡\n\n#أبعاد_جغرافية #غرائب #حقائق_مرعبة #طبيعة #Shorts",
+            "scenes": [
+                {"hook": "أنت تعرف إن في بحيرة في إفريقيا بتحول أي طائر يلمسها لحجر متكلس فوراً؟", "display": ["بحيرة النطرون في تنزانيا", "بتحول أي طائر يلمسها", "إلى تمثال حجري فوراً!"], "query": "lake pink water aerial", "img_backup": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1080&h=1920&fit=crop"},
+                {"hook": "البحيرة دي اسمها بحيرة النطرون، ودرجة ملوحتها وحرارتها بتوصل لستين درجة مئوية!", "display": ["درجة حرارتها بتوصل", "لستين درجة مئوية", "بمياه شديدة القلوية!"], "query": "volcanic lake steam", "img_backup": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1080&h=1920&fit=crop"},
+                {"hook": "وفي أبرد قرية في روسيا، درجة الحرارة بتنزل لواحد وسبعين تحت الصفر، والرموش بتتجمد في ثانية!", "display": ["وفي قرية أويمياكون", "الحرارة 71 تحت الصفر", "والأنفاس بتتجمد فوراً!"], "query": "snow blizzard siberia", "img_backup": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1080&h=1920&fit=crop"},
+                {"hook": "أما حفرة دارفازا في تركمانستان فبتشتعل بنيران غازية مستمرة من أكتر من خمسين سنة!", "display": ["وحفرة بوابة جهنم", "مشتعلة بالنيران المستمرة", "من أكثر من 50 عاماً!"], "query": "fire pit flames dark", "img_backup": "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?w=1080&h=1920&fit=crop"},
+                {"hook": "ما تنساش تكتب سبحان الله في التعليقات وتشترك في القناة وتعمل لايك!", "display": ["اكتب سبحان الله في التعليقات", "واشترك في القناة حالا!", "واعمل لايك للفيديو"], "query": "space earth night", "img_backup": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1080&h=1920&fit=crop"}
+            ]
+        },
+        {
+            "title": "ظواهر جغرافية مرعبة ستجعلك ترتجف من الغموض !!😱⚡",
+            "desc": "أسرار جغرافية لا يصدقها عقل عن الصحاري والبراكين! اكتب سبحان الله واشترك 🌍⚡\n\n#أبعاد_جغرافية #جغرافيا #غرائب #Shorts",
+            "scenes": [
+                {"hook": "أنت تعرف إن صحراء أتاكاما في تشيلي، في أجزاء منها ما نزلش عليها نقطة مطر من أربعمئة سنة؟", "display": ["صحراء أتاكاما في تشيلي", "ما نزلش عليها مطر", "من 400 سنة متواصلة!"], "query": "desert dry landscape drone", "img_backup": "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=1080&h=1920&fit=crop"},
+                {"hook": "والرمال هناك بتشبه سطح كوكب المريخ لدرجة إن وكالة ناسا بتختبر مركبات الفضاء فيها!", "display": ["ناسا بتختبر مركباتها هناك", "لأن تضاريسها نسخة طبق الأصل", "من كوكب المريخ!"], "query": "mars rover red planet", "img_backup": "https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?w=1080&h=1920&fit=crop"},
+                {"hook": "ونهر الأمازون العملاق، بطول آلاف الكيلومترات، ما فيهوش ولا كوبري واحد مبني فوقه!", "display": ["ونهر الأمازون العملاق", "لا يوجد فوقه أي جسر", "على الإطلاق!"], "query": "amazon river jungle", "img_backup": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1080&h=1920&fit=crop"},
+                {"hook": "وفي إندونيسيا، في بركان بيقذف حمم بركانية بلون أزرق كهربائي ساطع في الليل الدامس!", "display": ["وبركان كاواه إيجين", "بيقذف نيران وحمم زرقاء", "في ظلام الليل!"], "query": "volcano blue lava night", "img_backup": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1080&h=1920&fit=crop"},
+                {"hook": "ما تنساش تكتب سبحان الله في التعليقات وتشترك في القناة وتعمل لايك!", "display": ["اكتب سبحان الله في التعليقات", "واشترك في القناة حالا!", "واعمل لايك للفيديو"], "query": "planet earth horizon", "img_backup": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1080&h=1920&fit=crop"}
+            ]
+        }
+    ],
 
-    # 🚢 القناة الثالثة: مسار
-    "مسار": {
-        "title": "أسرار مرعبة عن المضائق وطرق التجارة العالمية !!😱🚢",
-        "desc": "أخطر وأهم الممرات المائية التي تقود العالم! لا تنسَ كتابة سبحان الله والاشتراك بالقناة 🚢⚡\n\n#مسار #اقتصاد #تجارة #مضائق #قناة_السويس #Shorts",
-        "scenes": [
-            {
-                "hook": "أنت تعرف إن لو مضيق هرمز اتقفل يوم واحد، أسعار البنزين والنفط في العالم هتنفجر فوراً؟",
-                "display": ["لو مضيق هرمز اتقفل", "خُمس نفط كوكب الأرض", "هيتوقف في لحظة!"],
-                "query": "oil tanker ship sea",
-                "img_backup": "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "وقناة السويس بيمر عبرها تريليونات الدولارات سنوياً، وهي نبض التجارة بين الشرق والغرب!",
-                "display": ["وقناة السويس بيمر منها", "أكتر من 12 بالمئة", "من تجارة العالم كله!"],
-                "query": "container vessel canal",
-                "img_backup": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "وقناة بنما بترفع السفن العملاقة فوق الجبل لارتفاع ستة وعشرين متراً بنظام مائي عبقري!",
-                "display": ["وقناة بنما بترفع السفن", "26 متر فوق الجبال", "عبر أهوسة مائية مذهلة!"],
-                "query": "ship lock panama",
-                "img_backup": "https://images.unsplash.com/photo-1505705694340-019e1e335916?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "ومضيق ملقا بتمر منه مئة ألف سفينة سنوياً وسط حراسة مشددة ضد القرصنة البحرية!",
-                "display": ["ومضيق ملقا بتمر منه", "100 ألف سفينة سنوياً", "في ممر بحري ضيق!"],
-                "query": "cargo vessel ocean",
-                "img_backup": "https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1080&h=1920&fit=crop"
-            },
-            {
-                "hook": "ما تنساش تكتب سبحان الله في التعليقات وتشترك في القناة وتعمل لايك!",
-                "display": ["اكتب سبحان الله في التعليقات", "واشترك في القناة حالا!", "واعمل لايك للفيديو"],
-                "query": "blue sea aerial",
-                "img_backup": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1080&h=1920&fit=crop"
-            }
-        ]
-    }
+    "مشاريع عملاقة": [
+        {
+            "title": "أضخم آلات حفر وأنفاق صنعتها البشرية في التاريخ !!😱🏗️",
+            "desc": "معجزات هندسية وآلات جبارة تخترق الجبال وقيعان البحار! اكتب سبحان الله واشترك 🏗️⚡\n\n#مشاريع_عملاقة #هندسة #بناء #ناطحات_سحاب #Shorts",
+            "scenes": [
+                {"hook": "أنت تعرف إن أضخم آلة حفر أنفاق في العالم، وزنها سبعة آلاف طن وطولها ملعب كرة قدم؟", "display": ["آلة الحفر بيرثا", "وزنها 7 آلاف طن", "وبطول ملعب كرة قدم!"], "query": "tunnel boring machine underground", "img_backup": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1080&h=1920&fit=crop"},
+                {"hook": "الآلة دي بتقدر تقطع الصخور الصلبة وتثبت جدران الخرسانة المسلحة في نفس الدقيقة!", "display": ["بتقطع الجبال الشاهقة", "وتبني جدار الخرسانة", "في نفس اللحظة!"], "query": "construction heavy machinery", "img_backup": "https://images.unsplash.com/photo-1541888946425-d0fbb186c5f7?w=1080&h=1920&fit=crop"},
+                {"hook": "وجسر ميلاو في فرنسا، أعمدته الخرسانية أعلى من برج إيفل وبتمر السحب من تحت الجسر!", "display": ["وجسر ميلاو في فرنسا", "أعلى من برج إيفل", "والغيوم بتمر تحته!"], "query": "highest bridge clouds valley", "img_backup": "https://images.unsplash.com/photo-1545558014-8692077e9b5c?w=1080&h=1920&fit=crop"},
+                {"hook": "وفي هولندا، بنوا أعظم سد هيدروليكي متحرك في العالم لحماية مدن كاملة من الغرق في البحر!", "display": ["وهولندا بنت بوابات عملاقة", "بتحمي مدن كاملة", "من الغرق في المحيط!"], "query": "ocean sea wall barrier storm", "img_backup": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1080&h=1920&fit=crop"},
+                {"hook": "ما تنساش تكتب سبحان الله وتشترك في القناة وتعمل لايك!", "display": ["اكتب سبحان الله في التعليقات", "واشترك في القناة حالا!", "واعمل لايك للفيديو"], "query": "skyscraper construction night", "img_backup": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1080&h=1920&fit=crop"}
+            ]
+        }
+    ],
+
+    "مسار": [
+        {
+            "title": "أسرار أضخم سفن الحاويات وحوادث المضائق الكارثية !!😱🚢",
+            "desc": "أخطر كواليس سلاسل الإمداد وممرات التجارة الدولية! اكتب سبحان الله واشترك بالقناة 🚢⚡\n\n#مسار #تجارة #مضائق #اقتصاد #Shorts",
+            "scenes": [
+                {"hook": "أنت تعرف إن سفينة الحاويات الحديثة بتقدر تشيل أربعة وعشرين ألف حاوية بضائع عملاقة؟", "display": ["سفينة الشحن الحديثة", "بتشيل 24 ألف حاوية", "بحجم ناطحة سحاب!"], "query": "massive container ship ocean", "img_backup": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1080&h=1920&fit=crop"},
+                {"hook": "ولو رصينا الحاويات دي في خط مستقيم، هتعمل طريق طوله مئة وخمسين كيلومتراً متواصلاً!", "display": ["حاوياتها لو اترصت بالخط", "طولها بيوصل 150 كيلومتر", "بدون أي فراغ!"], "query": "shipping port container crane", "img_backup": "https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1080&h=1920&fit=crop"},
+                {"hook": "وحادثة جنوح إيفر جيفن في قناة السويس، وقفت تجارة بقيمة عشرة مليارات دولار كل أربع وعشرين ساعة!", "display": ["جنوح سفينة في السويس", "عطّل 10 مليارات دولار", "في اليوم الواحد!"], "query": "suez canal ship stuck", "img_backup": "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=1080&h=1920&fit=crop"},
+                {"hook": "وأكتر من تسعين بالمئة من كل شاشات وهواتف وملابس العالم، بتسافر في أعالي البحار قبل ما توصلك!", "display": ["90% من كل أجهزتك", "بتسافر آلاف الأميال بحراً", "عبر سلاسل الإمداد!"], "query": "freight ship open sea", "img_backup": "https://images.unsplash.com/photo-1505705694340-019e1e335916?w=1080&h=1920&fit=crop"},
+                {"hook": "ما تنساش تكتب سبحان الله في التعليقات وتشترك في القناة وتعمل لايك!", "display": ["اكتب سبحان الله في التعليقات", "واشترك في القناة حالا!", "واعمل لايك للفيديو"], "query": "blue sea sunrise", "img_backup": "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1080&h=1920&fit=crop"}
+            ]
+        }
+    ]
 }
 
-NICHE_KEYS = list(CHANNELS_CONTENT.keys())
+# 3. توليد سكريبت جديد كلياً بالذكاء الاصطناعي (Gemini) إن وجد المفتاح
+def generate_ai_script(niche_name):
+    """توليد سكريبت جديد وفريد تماماً بأسلوب غابرييل عماد عبر Gemini API"""
+    if not GEMINI_API_KEY:
+        return None
 
-# 3. إعداد خط Noto Sans Arabic Bold
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        seed = random.randint(1000, 99999)
+        prompt = f"""
+أنت كاتب محتوى يوتيوب شورتس محترف جداً مثل أسلوب "غابرييل عماد".
+المجال المطلوب: {niche_name}.
+رقم البذرة العشوائية لعدم التكرار: {seed}.
+اكتب موضوعاً جديداً، غريباً، ومثيراً جداً لم يتم تكراره من قبل.
+يجب أن ترجع النتيجة بصيغة JSON فقط دون أي شروح أو علامات ماركداون:
+{{
+  "title": "عنوان جذاب وصادم مع إيموجي",
+  "desc": "وصف قصير مع هاشتاجات",
+  "scenes": [
+    {{
+      "hook": "الجملة المحكية بالعامية المشوقة أو الفصحى المبسطة",
+      "display": ["السطر الأول للعرض", "السطر الثاني للعرض", "السطر الثالث للعرض"],
+      "query": "english search term for stock video",
+      "img_backup": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1080&h=1920&fit=crop"
+    }},
+    ... (إجمالي 5 مشاهد، المشهد الأخير دائماً دعوة لكتابة سبحان الله والاشتراك)
+  ]
+}}
+        """
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        res = requests.post(url, json=payload, timeout=20)
+        if res.status_code == 200:
+            txt = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+            txt = txt.strip().replace("```json", "").replace("```", "")
+            data = json.loads(txt)
+            if "scenes" in data and len(data["scenes"]) >= 4:
+                print(f"🤖 تم بنجاح توليد سكريبت حصري جديد بالذكاء الاصطناعي: {data.get('title')}")
+                return data
+    except Exception as e:
+        print(f"⚠️ تعذر توليد السكريبت بـ Gemini ({e})، سيتم السحب من بنك المواضيع المتنوعة.")
+    return None
+
+def get_channel_content(niche_name):
+    """جلب محتوى جديد تماماً إما عبر الذكاء الاصطناعي أو بالاختيار العشوائي من البنك"""
+    ai_content = generate_ai_script(niche_name)
+    if ai_content:
+        return ai_content
+
+    # السحب العشوائي من بنك المواضيع الاحتياطي
+    pool = FALLBACK_TOPICS_POOL.get(niche_name, [])
+    selected = random.choice(pool).copy()
+    # خلط ترتيب المشاهد الداخلية العشوائية (مع الحفاظ على المشهد الأول والأخير)
+    if len(selected["scenes"]) > 3:
+        middle = selected["scenes"][1:-1]
+        random.shuffle(middle)
+        selected["scenes"] = [selected["scenes"][0]] + middle + [selected["scenes"][-1]]
+    return selected
+
+# 4. معالجة النصوص والرسم
 def get_best_arabic_font(size=54):
     for p in [
         "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf",
@@ -225,10 +224,7 @@ def fetch_pexels_video(query, target_filename):
     if PEXELS_API_KEY:
         try:
             url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation=portrait"
-            headers = {
-                "Authorization": PEXELS_API_KEY,
-                "User-Agent": "Mozilla/5.0"
-            }
+            headers = {"Authorization": PEXELS_API_KEY, "User-Agent": "Mozilla/5.0"}
             res = requests.get(url, headers=headers, timeout=15)
             if res.status_code == 200:
                 data = res.json()
@@ -258,17 +254,16 @@ def fetch_pexels_video(query, target_filename):
             print(f"⚠️ تنبيه Pexels ({e})، سيتم الانتقال للبديل التلقائي.")
     return False
 
-def build_gabriel_short(channel_name, ch_idx):
-    """بناء فيديو شورتس كامل بلقطات فيديو حقيقية أو لقطات سينمائية متحركة بديلة"""
+def build_gabriel_short(content_data, ch_idx):
+    """بناء فيديو شورتس كامل وفريد تماماً للقناة"""
     size = (1080, 1920)
-    data = CHANNELS_CONTENT[channel_name]
-    scenes_data = data["scenes"]
+    scenes_data = content_data["scenes"]
 
     scenes = []
     temp_files = []
 
     for s_idx, item in enumerate(scenes_data):
-        print(f"🎬 معالجة المشهد ({s_idx + 1}/{len(scenes_data)}): {item['query']}")
+        print(f"🎬 معالجة المشهد ({s_idx + 1}/{len(scenes_data)}): {item.get('query', 'scene')}")
 
         # 1. الصوت
         aud_path = f"aud_{ch_idx}_{s_idx}.mp3"
@@ -279,7 +274,7 @@ def build_gabriel_short(channel_name, ch_idx):
 
         # 2. تحميل مقطع الفيديو أو اللقطة السينمائية البديلة
         raw_video_path = f"stock_{ch_idx}_{s_idx}.mp4"
-        success = fetch_pexels_video(item["query"], raw_video_path)
+        success = fetch_pexels_video(item.get("query", "nature"), raw_video_path)
 
         video_clip = None
         if success:
@@ -296,14 +291,13 @@ def build_gabriel_short(channel_name, ch_idx):
                 video_clip = clip.crop(x_center=clip.w // 2, y_center=clip.h // 2, width=1080, height=1920)
                 temp_files.append(raw_video_path)
             except Exception as e:
-                print(f"⚠️ تعذر تشغيل المقطع ({e})، سيتم تشغيل اللقطة السينمائية البديلة.")
                 video_clip = None
 
-        # البديل السلس والمضمون 100% في حال عدم توفر الفيديو
         if video_clip is None:
             img_path = f"img_{ch_idx}_{s_idx}.jpg"
             try:
-                r = requests.get(item["img_backup"], headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+                backup_url = item.get("img_backup", "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1080&h=1920&fit=crop")
+                r = requests.get(backup_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
                 im = Image.open(io.BytesIO(r.content)).convert("RGB")
                 im = im.resize(size, Image.Resampling.LANCZOS)
                 im.save(img_path, "JPEG")
@@ -317,12 +311,11 @@ def build_gabriel_short(channel_name, ch_idx):
                           .resize(lambda t: 1 + 0.04 * t)
                           .crop(x_center=540, y_center=960, width=1080, height=1920))
 
-        # 3. النص العريض المحدد في المنتصف (ستايل غابرييل عماد)
+        # 3. النص العريض المحدد في المنتصف
         caption_path = create_gabriel_caption(item["display"], ch_idx, s_idx, size=size)
         caption_clip = ImageClip(caption_path).set_duration(duration)
         temp_files.append(caption_path)
 
-        # دمج المشهد
         scene = CompositeVideoClip([video_clip, caption_clip], size=size).set_audio(aud_clip)
         scenes.append(scene)
 
@@ -338,7 +331,6 @@ def build_gabriel_short(channel_name, ch_idx):
         preset="ultrafast"
     )
 
-    # تنظيف الملفات المؤقتة
     for f in temp_files:
         if os.path.exists(f):
             try: os.remove(f)
@@ -347,10 +339,8 @@ def build_gabriel_short(channel_name, ch_idx):
     return out_name
 
 def upload_video_file(file_path):
-    """رفع الفيديو إلى Uguu للحصول على رابط مباشر فوري لـ Buffer"""
-    print(f"☁️ جاري رفع {file_path} للحصول على رابط مباشر...")
-
-    # 1. Uguu
+    """رفع الفيديو للحصول على رابط مباشر فوري لـ Buffer"""
+    print(f"☁️ جاري رفع {file_path}...")
     try:
         with open(file_path, "rb") as f:
             r = requests.post("https://uguu.se/upload", files={"files[]": (os.path.basename(file_path), f, "video/mp4")}, timeout=120)
@@ -358,28 +348,25 @@ def upload_video_file(file_path):
                 data = r.json()
                 if data.get("success") and data.get("files"):
                     url = data["files"][0]["url"]
-                    print(f"🔗 تم الرفع عبر Uguu: {url}")
+                    print(f"🔗 تم الرفع بنجاح: {url}")
                     return url
     except Exception as e:
         print(f"⚠️ خطأ Uguu: {e}")
 
-    # 2. Pixeldrain كخادم بديل
     try:
         with open(file_path, "rb") as f:
             r = requests.post("https://pixeldrain.com/api/file", files={"file": (os.path.basename(file_path), f, "video/mp4")}, timeout=120)
             if r.status_code in [200, 201]:
                 fid = r.json().get("id")
                 if fid:
-                    url = f"https://pixeldrain.com/api/file/{fid}"
-                    print(f"🔗 تم الرفع عبر Pixeldrain: {url}")
-                    return url
-    except Exception as e:
-        print(f"⚠️ خطأ Pixeldrain: {e}")
+                    return f"https://pixeldrain.com/api/file/{fid}"
+    except Exception:
+        pass
 
     raise Exception("فشلت جميع خوادم الرفع المباشر.")
 
 def publish_to_buffer_now(channel_id, title, desc, video_url):
-    """نشر فوري ولحظي على القناة دون إرسال إلى قائمة الانتظار"""
+    """نشر فوري ولحظي على يوتيوب عبر Buffer دون إرسال إلى قائمة الانتظار"""
     url = "https://api.buffer.com"
     headers = {"Authorization": f"Bearer {BUFFER_TOKEN}", "Content-Type": "application/json"}
     query = """
@@ -418,18 +405,20 @@ def main():
     print(f"📋 إجمالي عدد القنوات المستهدفة: {len(CHANNELS_LIST)}")
 
     for idx, channel_id in enumerate(CHANNELS_LIST):
-        niche_name = NICHE_KEYS[idx % len(NICHE_KEYS)]
-        data = CHANNELS_CONTENT[niche_name]
-
+        niche_name = NICHE_NAMES[idx % len(NICHE_NAMES)]
+        
         print(f"\n=======================================================")
-        print(f"🎬 [القناة {idx+1}/{len(CHANNELS_LIST)}] إنتاج شورتس (Stock Videos & Gabriel Style): {niche_name}")
+        print(f"🎬 [القناة {idx+1}/{len(CHANNELS_LIST)}] تجهيز موضوع جديد وحصري لقناة: {niche_name}")
         print(f"=======================================================")
 
-        video_path = build_gabriel_short(niche_name, idx)
+        # جلب موضوع وسيناريو جديد وغير مكرر إطلاقاً
+        content_data = get_channel_content(niche_name)
+
+        video_path = build_gabriel_short(content_data, idx)
         video_url = upload_video_file(video_path)
 
         print(f"⚡ نشر مباشر ولحظي إلى يوتيوب الآن...")
-        publish_to_buffer_now(channel_id, data["title"], data["desc"], video_url)
+        publish_to_buffer_now(channel_id, content_data["title"], content_data["desc"], video_url)
 
         if os.path.exists(video_path):
             try: os.remove(video_path)
