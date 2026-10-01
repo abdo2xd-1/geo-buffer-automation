@@ -8,6 +8,7 @@ import subprocess
 import requests
 import PIL.Image
 
+# ترقيع التوافق بين Pillow و MoviePy
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     setattr(PIL.Image, 'ANTIALIAS', PIL.Image.Resampling.LANCZOS)
 
@@ -23,14 +24,13 @@ from moviepy.editor import (
     vfx
 )
 
-# 1. المفاتيح والقنوات
+# 1. المفاتيح والمجالات
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
 
 NICHE_NAMES = ["أبعاد جغرافية", "مشاريع عملاقة", "مسار"]
 
-# 2. خطوط النصوص للأبعاد العريضة 16:9
+# 2. إعداد الخط العربي للأبعاد العريضة (1920x1080)
 def get_best_arabic_font(size=44):
     for p in [
         "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf",
@@ -38,17 +38,19 @@ def get_best_arabic_font(size=44):
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     ]:
         if os.path.exists(p):
-            try: return ImageFont.truetype(p, size)
-            except Exception: pass
+            try:
+                return ImageFont.truetype(p, size)
+            except Exception:
+                pass
     return ImageFont.load_default()
 
 def clean_arabic(text):
     return re.sub(r'[^\w\s\d\u0600-\u06FF!؟,\.\:\-\(\)\"\$]+', '', text).strip()
 
-# 3. محرك توليد السيناريو المطول (1200 كلمة بأسلوب غابرييل عماد)
+# 3. محرك توليد سيناريو الـ 8 دقائق (نظام الفصول بأسلوب غابرييل عماد)
 def generate_8min_documentary(niche_name):
     if not GEMINI_API_KEY:
-        raise Exception("GEMINI_API_KEY غير متوفر لتوليد السكربت الطويل.")
+        raise Exception("مفتاح GEMINI_API_KEY غير موجود في الـ Secrets.")
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     prompt = f"""
@@ -92,16 +94,15 @@ def generate_8min_documentary(niche_name):
         raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
         raw_text = raw_text.strip().replace("```json", "").replace("```", "")
         return json.loads(raw_text)
-    raise Exception("فشل الاتصال بـ Gemini لتوليد الوثائقي الطويل.")
+    raise Exception(f"فشل الاتصال بـ Gemini: {res.text}")
 
-# 4. التوليد الصوتي للسرد بالعامية المصرية عبر Edge-TTS
+# 4. التوليد الصوتي بالعامية المصرية الهادئة
 async def generate_voice(text, output_file):
     import edge_tts
-    # استخدام صوت مصري وثائقي دافئ متزن السرعة
     communicate = edge_tts.Communicate(text, "ar-EG-ShakirNeural", rate="+6%")
     await communicate.save(output_file)
 
-# 5. جلب مقاطع فيديو أفقية 16:9 بجودة Full HD
+# 5. سحب لقطات أفقية (Landscape 16:9) بجودة Full HD
 def fetch_landscape_video(query, target_filename):
     if PEXELS_API_KEY:
         try:
@@ -128,10 +129,10 @@ def fetch_landscape_video(query, target_filename):
                                     if chunk: f.write(chunk)
                             return True
         except Exception as e:
-            print(f"⚠️ خطأ في جلب لقطة {query}: {e}")
+            print(f"⚠️ خطأ في سحب لقطة {query}: {e}")
     return False
 
-# 6. تصميم لوحة التعريف السفلية الوثائقية (Lower-Third 16:9)
+# 6. تصميم لوحة التعريف السفلية (Lower-Third 16:9)
 def create_lower_third(text, target_path, size=(1920, 1080)):
     img = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -147,7 +148,6 @@ def create_lower_third(text, target_path, size=(1920, 1080)):
     bbox = draw.textbbox((0, 0), clean_txt, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
 
-    # وضع الكبسولة في الركن السفلي الأيمن بنمط وثائقي أنيق
     bx2 = 1920 - 100
     bx1 = bx2 - tw - 50
     by1 = 1080 - 180
@@ -157,7 +157,7 @@ def create_lower_third(text, target_path, size=(1920, 1080)):
     draw.text(((bx1 + bx2) // 2, by1 + 10), clean_txt, font=font, fill=(255, 255, 255, 255), anchor="mt", direction="rtl" if has_raqm else None)
     img.save(target_path)
 
-# 7. بناء ريندر الفصل الواحد وتصديره
+# 7. بناء رندر الفصل الواحد وتصديره كملف مستقل
 def render_chapter_chunk(chapter_data, chapter_idx):
     size = (1920, 1080)
     scenes = []
@@ -165,7 +165,7 @@ def render_chapter_chunk(chapter_data, chapter_idx):
     voice_clips = []
     current_time = 0.0
 
-    print(f"\n🎬 بناء الفصل {chapter_idx + 1}: {chapter_data['chapter_title']}")
+    print(f"\n🎬 معالجة الفصل {chapter_idx + 1}: {chapter_data['chapter_title']}")
 
     for s_idx, sc in enumerate(chapter_data["scenes"]):
         aud_path = f"aud_c{chapter_idx}_s{s_idx}.mp3"
@@ -193,7 +193,6 @@ def render_chapter_chunk(chapter_data, chapter_idx):
         else:
             clip = ColorClip(size=size, color=(15, 23, 42)).set_duration(duration)
 
-        # إضافة لوحة الـ Lower-Third للمشهد
         lt_path = f"lt_c{chapter_idx}_s{s_idx}.png"
         create_lower_third(sc.get("lower_third", "وثائقي استقصائي"), lt_path, size=size)
         temp_files.append(lt_path)
@@ -218,7 +217,6 @@ def render_chapter_chunk(chapter_data, chapter_idx):
         threads=2
     )
 
-    # تنظيف الملفات المؤقتة الخاصة بالفصل
     for f in temp_files:
         if os.path.exists(f):
             try: os.remove(f)
@@ -226,8 +224,8 @@ def render_chapter_chunk(chapter_data, chapter_idx):
 
     return chunk_filename
 
-# 8. دمج الفصول نهائياً بواسطة FFmpeg Concat Demuxer
-def stitch_chapters_with_ffmpeg(chunk_files, output_filename="final_8min_documentary.mp4"):
+# 8. دمج الفصول نهائياً بـ FFmpeg في ثوانٍ
+def stitch_chapters_with_ffmpeg(chunk_files, output_filename="documentary_8min.mp4"):
     print("\n⚡ بدء الدمج الفوري للفصول عبر FFmpeg Concat...")
     list_path = "chapters_list.txt"
     with open(list_path, "w", encoding="utf-8") as f:
@@ -242,7 +240,6 @@ def stitch_chapters_with_ffmpeg(chunk_files, output_filename="final_8min_documen
     ]
     subprocess.run(cmd, check=True)
 
-    # إزالة الأجزاء المؤقتة وقائمة الفصول
     if os.path.exists(list_path):
         os.remove(list_path)
     for chunk in chunk_files:
@@ -269,7 +266,6 @@ def main():
 
     final_video_path = stitch_chapters_with_ffmpeg(chunk_files, "documentary_8min.mp4")
 
-    # حفظ بيانات الوصف والعنوان لاستخدامها أثناء الرفع
     with open("video_metadata.json", "w", encoding="utf-8") as f:
         json.dump({
             "title": doc_data["title"],
