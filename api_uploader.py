@@ -11,16 +11,17 @@ CHANNELS_MAP = {
     "masar": "REFRESH_TOKEN_MASAR"
 }
 
+CLIENT_ID = "814988815489-i0gen64eparrgsm67gp9mapqahf0or9p.apps.googleusercontent.com"
+CLIENT_SECRET = "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"
+
 def upload_to_youtube(channel_key, video_file, title, description):
     channel_key = channel_key.lower().strip()
     secret_env = CHANNELS_MAP.get(channel_key)
     
-    client_id = (os.getenv("YOUTUBE_CLIENT_ID") or "").strip().strip('"\'')
-    client_secret = (os.getenv("YOUTUBE_CLIENT_SECRET") or "").strip().strip('"\'')
     refresh_token = (os.getenv(secret_env) or "").strip().strip('"\'')
 
-    if not all([client_id, client_secret, refresh_token]):
-        sys.exit(f"❌ خطأ: بيانات الاعتماد غير مكتملة للقناة {channel_key}!")
+    if not refresh_token:
+        sys.exit(f"❌ خطأ: التوكن غير معرّف للقناة {channel_key} ({secret_env})!")
 
     print(f"🔑 جاري تفويض الصلاحيات للقناة [{channel_key}]...")
     
@@ -28,17 +29,13 @@ def upload_to_youtube(channel_key, video_file, title, description):
         token=None,
         refresh_token=refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=client_id,
-        client_secret=client_secret,
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
         scopes=["https://www.googleapis.com/auth/youtube.upload"]
     )
 
-    try:
-        # تجديد التوكن واختبار الصلاحية
-        creds.refresh(Request())
-        print("✅ تم التحقق من صلاحية التوكن بنجاح!")
-    except Exception as e:
-        sys.exit(f"❌ فشل تجديد التوكن للقناة {channel_key}: {e}\nتأكد من صحة التوكن في GitHub Secrets.")
+    creds.refresh(Request())
+    print("✅ تم التحقق من الصلاحيات وتجديد الجلسة بنجاح!")
 
     youtube = build("youtube", "v3", credentials=creds)
 
