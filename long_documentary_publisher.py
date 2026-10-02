@@ -13,17 +13,57 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 
-# --- 1. مفاتيح التشغيل وإعداد الذكاء الاصطناعي ---
+# --- 1. مفاتيح التشغيل واختيار النموذج تلقائياً ---
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 PEXELS_KEY = os.getenv("PEXELS_API_KEY")
 
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
 
-# المعلق الصوتي البشري (شاكر: وثائقي مصري فخم وهادئ، أو ar-SA-HamedNeural)
-VOICE_NAME = "ar-EG-ShakirNeural"
+def select_active_gemini_model():
+    """فحص واختيار أفضل نموذج متاح وفعال تلقائياً لحسابك لمنع خطأ 404"""
+    preferred_models = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-002",
+        "gemini-1.5-pro",
+        "gemini-pro"
+    ]
+    
+    # محاولة جلب قائمة النماذج المتاحة من جوجل مباشرة
+    try:
+        available = [
+            m.name.replace("models/", "") 
+            for m in genai.list_models() 
+            if "generateContent" in m.supported_generation_methods
+        ]
+        print(f"📋 النماذج المتاحة لحسابك: {available}")
+        for pref in preferred_models:
+            if pref in available:
+                print(f"🎯 تم اختيار النموذج المعتمد: [{pref}]")
+                return genai.GenerativeModel(pref)
+        if available:
+            print(f"🎯 تم اختيار أول نموذج داعم: [{available[0]}]")
+            return genai.GenerativeModel(available[0])
+    except Exception as e:
+        print(f"⚠️ تعذر جلب قائمة النماذج تلقائياً ({e})، سيتم تجربة قائمة النماذج الاحتياطية...")
 
-# --- 2. ابتكار فكرة وثائقية عشوائية تماماً بدون حصر ---
+    # تجربة النماذج الشائعة بالترتيب
+    for name in preferred_models:
+        try:
+            m = genai.GenerativeModel(name)
+            m.generate_content("test")
+            print(f"🎯 نجح الاتصال بالنموذج: [{name}]")
+            return m
+        except Exception:
+            continue
+            
+    return genai.GenerativeModel("gemini-2.0-flash")
+
+model = select_active_gemini_model()
+VOICE_NAME = "ar-EG-ShakirNeural"  # صوت بشري وثائقي طبيعي
+
+# --- 2. ابتكار فكرة وثائقية عشوائية تماماً ---
 def get_random_documentary_idea(channel_name: str) -> dict:
     print(f"🎲 جاري ابتكار فكرة وثائقية عشوائية وشديدة التشويق لقناة [{channel_name}]...")
     
@@ -37,9 +77,9 @@ def get_random_documentary_idea(channel_name: str) -> dict:
     
     أخرج النتيجة بصيغة JSON حصراً بدون أي نصوص أخرى:
     {{
-        "title": "عنوان وثائقي عربي تشويقي جداً وقصير",
+        "title": "عنوان وثائقي عربي تشويقي وقصير",
         "description": "وصف جذاب ومختصر لموضوع الوثائقي",
-        "search_keywords": ["4", "كلمات", "بحث", "إنجليزية", "لجلب", "فيديوهات", "مناسبة"]
+        "search_keywords": ["aerial landscape", "historical mystery", "cinematic footage 4k", "epic documentary"]
     }}
     """
     
@@ -47,17 +87,24 @@ def get_random_documentary_idea(channel_name: str) -> dict:
         response = model.generate_content(prompt)
         cleaned = response.text.strip().replace("```json", "").replace("```", "")
         data = json.loads(cleaned)
-    except Exception:
+    except Exception as err:
+        print(f"⚠️ حدث خطأ أثناء قراءة الـ JSON ({err})، جاري استخدام فكرة عشوائية بديلة...")
+        topics_pool = [
+            ("أسرار الممالك المفقودة: مدن ابتلعتها الرمال", "استكشاف أعمق المدن الأثرية التي اختفت في ظروف غامضة ولم يتبق منها سوى أطلال محيرة.", ["ancient ruins 4k", "desert mystery", "archaeology", "drone history"]),
+            ("خفايا الحدود المغلقة: ألغاز جغرافية حيرت العالم", "حقائق صادمة حول أكثر المناطق المعزولة والحدود الجغرافية غرابة على وجه الأرض.", ["mountain border", "extreme landscape", "military bunker", "remote island aerial"]),
+            ("حرب الأكواد: كيف غيرت العمليات السرية مسار التاريخ؟", "كواليس العمليات الاستخباراتية والتقنية التي حسمت صراعات عالمية دون إطلاق رصاصة واحدة.", ["cyber tech futuristic", "server room lights", "secret documents", "vintage intelligence"])
+        ]
+        chosen = random.choice(topics_pool)
         data = {
-            "title": "أسرار ما وراء الطبيعة: حقائق صادمة لم تُروى",
-            "description": "رحلة وثائقية استكشافية تكشف أكثر الظواهر غموضاً في تاريخ البشرية.",
-            "search_keywords": ["cinematic nature 4k", "mysterious landscape", "aerial drone view", "ancient history documentary"]
+            "title": chosen[0],
+            "description": chosen[1],
+            "search_keywords": chosen[2]
         }
     
     print(f"  💡 العنوان المختار: {data['title']}")
     return data
 
-# --- 3. توليد سيناريو وثائقي طويل جداً (+2800 كلمة لتخطي 20 دقيقة) ---
+# --- 3. توليد سيناريو وثائقي طويل (+2800 كلمة لتجاوز 20 دقيقة) ---
 def generate_full_script(title: str, description: str) -> str:
     print(f"✍️ جاري كتابة السيناريو الوثائقي المطول (هدف: +20 دقيقة تعليق)...")
     
@@ -84,11 +131,21 @@ def generate_full_script(title: str, description: str) -> str:
         2. استخدم لغة عربية فصحى وثائقية فخمة وسردية مشوقة بدون حشو.
         3. اكتب فقط ما ينطقه الراوي بصوته مباشرة، وتجنب تماماً كتابة (مشهد، فاصل، راوي، موسيقى).
         """
-        res = model.generate_content(prompt)
-        script_parts.append(res.text.strip())
-        print(f"  📝 تم إنجاز الجزء {idx} من {len(chapters)}...")
-        time.sleep(2)
-        
+        success = False
+        for attempt in range(3):
+            try:
+                res = model.generate_content(prompt)
+                script_parts.append(res.text.strip())
+                print(f"  📝 تم إنجاز الجزء {idx} من {len(chapters)}...")
+                success = True
+                time.sleep(2)
+                break
+            except Exception as e:
+                print(f"  ⚠️ محاولة {attempt+1} للجزء {idx} فشلت ({e})، إعادة المحاولة بعد 4 ثوانٍ...")
+                time.sleep(4)
+        if not success:
+            script_parts.append(f"تستمر الأحداث والوقائع في كشف المزيد من أبعاد {title} وتأثيراتها العميقة على مسار الأحداث.")
+            
     return "\n\n".join(script_parts)
 
 # --- 4. توليد التعليق الصوتي البشري (Edge-TTS) ---
@@ -104,7 +161,7 @@ def build_voiceover(text: str, output_path: str = "narration.mp3") -> float:
     print(f"🎧 مدة التعليق الصوتي الفعلي: {duration / 60:.2f} دقيقة ({duration:.1f} ثانية)")
     return duration
 
-# --- 5. جلب فيديوهات ومشاهد عالية الدقة من Pexels ---
+# --- 5. جلب مشاهد Pexels المطابقة ---
 def download_matching_footage(keywords: list, target_duration: float, output_dir: str = "clips") -> list:
     print(f"🎥 جاري تحميل المشاهد لتغطية مدة {target_duration / 60:.1f} دقيقة...")
     os.makedirs(output_dir, exist_ok=True)
@@ -152,7 +209,7 @@ def download_matching_footage(keywords: list, target_duration: float, output_dir
 
     return downloaded
 
-# --- 6. رندر ومونتاج الفيديو السريع عبر FFmpeg ---
+# --- 6. رندر ومونتاج FFmpeg السريع ---
 def assemble_documentary(clips: list, audio_path: str, output_path: str = "final_documentary.mp4"):
     print("🎬 جاري المونتاج ودمج الصوت والمشاهد عبر FFmpeg...")
     
@@ -173,7 +230,7 @@ def assemble_documentary(clips: list, audio_path: str, output_path: str = "final
     subprocess.run(cmd, check=True)
     print(f"🏆 اكتمل إنتاج الوثائقي بنجاح: {output_path}")
 
-# --- 7. رفع الوثائقي إلى يوتيوب بتقنية Resumable Upload ---
+# --- 7. رفع الوثائقي إلى يوتيوب ---
 def upload_to_youtube(file_path: str, channel_key: str, title: str, description: str):
     print(f"🚀 جاري رفع الوثائقي إلى قناة [{channel_key}]: \"{title}\"...")
     
@@ -214,7 +271,7 @@ def upload_to_youtube(file_path: str, channel_key: str, title: str, description:
             
     print(f"🎉 تم النشر بنجاح على يوتيوب! رابط الفيديو: https://youtu.be/{response['id']}")
 
-# --- التنفيذ الرئيسي ---
+# --- نقطة البداية ---
 if __name__ == "__main__":
     channel_key = sys.argv[1] if len(sys.argv) > 1 else "MASHAREE"
     channel_names = {
@@ -227,17 +284,17 @@ if __name__ == "__main__":
     # 1. فكرة عشوائية
     idea = get_random_documentary_idea(channel_title)
     
-    # 2. نص وثائقي +20 دقيقة
+    # 2. توليد النص المطول
     script = generate_full_script(idea["title"], idea["description"])
     
-    # 3. صوت بشري طبيعي
+    # 3. تسجيل الصوت البشري
     audio_dur = build_voiceover(script, "narration.mp3")
     
-    # 4. مشاهد مطابقة للفكرة
+    # 4. جلب المشاهد البصرية
     clips = download_matching_footage(idea["search_keywords"], target_duration=audio_dur)
     
-    # 5. مونتاج ورندر
+    # 5. المونتاج والرندر
     assemble_documentary(clips, "narration.mp3", "final_documentary.mp4")
     
-    # 6. الرفع لليوتيوب
+    # 6. الرفع
     upload_to_youtube("final_documentary.mp4", channel_key, idea["title"], idea["description"])
