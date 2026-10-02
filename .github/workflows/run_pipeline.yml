@@ -1,0 +1,51 @@
+name: Produce and Upload Documentaries
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * 1' # تشغيل أسبوعي تلقائي
+
+jobs:
+  run_pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify YouTube Tokens
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          REFRESH_TOKEN_ABAAD: ${{ secrets.REFRESH_TOKEN_ABAAD }}
+          REFRESH_TOKEN_MASHAREE: ${{ secrets.REFRESH_TOKEN_MASHAREE }}
+          REFRESH_TOKEN_MASAR: ${{ secrets.REFRESH_TOKEN_MASAR }}
+        run: python -u verify_tokens.py
+
+      - name: Produce & Upload (مشاريع عملاقة)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          REFRESH_TOKEN_MASHAREE: ${{ secrets.REFRESH_TOKEN_MASHAREE }}
+        run: |
+          python -u production_engine.py "مشاريع عملاقة"
+          python -u upload_video.py "MASHAREE"
