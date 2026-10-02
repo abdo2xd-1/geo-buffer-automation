@@ -412,7 +412,8 @@ def generate_alert_banner(text="تحذير: حقائق سرية وصادمة", p
     img.save(path)
     return path
 
-def create_header_badge(badge_text, size=(1080, 1920)):
+# الدالة بعد التصحيح وتمرير المعامل path
+def create_header_badge(badge_text, path="header_badge.png", size=(1080, 1920)):
     img = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = get_best_arabic_font(size=36)
@@ -567,7 +568,7 @@ def build_viral_short(channel_name, content_data, ch_idx):
         asyncio.run(generate_voice_ssml(item["hook"], aud_path, profile["voice"], profile["rate"]))
         aud_clip = AudioFileClip(aud_path)
         
-        # حماية إضافية: المشهد الفردي لا يزيد عن 9 ثوانٍ
+        # المشهد الفردي لا يزيد عن 9 ثوانٍ
         actual_dur = min(aud_clip.duration + 0.1, 9.0)
         temp_files.append(aud_path)
 
@@ -575,7 +576,6 @@ def build_viral_short(channel_name, content_data, ch_idx):
         speech_intervals.append((current_time, current_time + actual_dur))
         voice_audio_clips.append(aud_clip.set_start(current_time).subclip(0, min(aud_clip.duration, actual_dur)))
 
-        # كشف أصوات البيئة (Foley Mapping)
         q_lower = item.get("query", "").lower()
         if any(k in q_lower for k in ['sea', 'ocean', 'ship', 'water', 'canal', 'tanker', 'waves']):
             foley_ocean_times.append(current_time)
@@ -680,18 +680,18 @@ def build_viral_short(channel_name, content_data, ch_idx):
 
     final_video = concatenate_videoclips(scenes, method="compose")
     
-    # ضمان صارم: قص أي زيادة عن 55 ثانية لتوافق يوتيوب شورتس وBuffer
+    # حماية قصوى: ألا تزيد مدة الفيديو عن 55 ثانية
     if final_video.duration > 55.0:
         final_video = final_video.subclip(0, 55.0)
     total_duration = final_video.duration
 
     overlay_clips = [final_video]
 
-    vignette_path = generate_vignette_overlay()
+    vignette_path = generate_vignette_overlay(path=f"vignette_{ch_idx}.png", size=size)
     temp_files.append(vignette_path)
     overlay_clips.append(ImageClip(vignette_path).set_duration(total_duration))
 
-    grain_path = generate_film_grain_overlay()
+    grain_path = generate_film_grain_overlay(path=f"grain_{ch_idx}.png", size=size)
     temp_files.append(grain_path)
     overlay_clips.append(ImageClip(grain_path).set_duration(total_duration))
 
@@ -701,15 +701,16 @@ def build_viral_short(channel_name, content_data, ch_idx):
                     .set_position((0, 1920 - 20)))
     overlay_clips.append(progress_bar)
 
-    badge_path = create_header_badge(profile["badge"], size=size)
+    # استخدام اسم ملف مخصص للشارة لتفادي الخطأ السابق
+    badge_path = create_header_badge(profile["badge"], path=f"badge_{ch_idx}.png", size=size)
     temp_files.append(badge_path)
     overlay_clips.append(ImageClip(badge_path).set_duration(total_duration))
 
-    watermark_path = generate_brand_watermark(profile["handle"], size=size)
+    watermark_path = generate_brand_watermark(profile["handle"], path=f"watermark_{ch_idx}.png", size=size)
     temp_files.append(watermark_path)
     overlay_clips.append(ImageClip(watermark_path).set_duration(total_duration))
 
-    alert_path = generate_alert_banner("تحذير: حقائق سرية وصادمة")
+    alert_path = generate_alert_banner("تحذير: حقائق سرية وصادمة", path=f"alert_{ch_idx}.png", size=size)
     temp_files.append(alert_path)
     overlay_clips.append(ImageClip(alert_path).set_duration(1.2))
 
