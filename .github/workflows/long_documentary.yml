@@ -3,7 +3,7 @@ name: Produce and Upload Documentaries
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 17 * * *' # يومياً الساعة 7:00 مساءً بتوقيت مصر
+    - cron: '0 17 * * *' # يعمل تلقائياً كل يوم الساعة 7:00 مساءً بتوقيت مصر
 
 jobs:
   run_pipeline:
