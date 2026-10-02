@@ -1,48 +1,43 @@
 import os
 import sys
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
+import json
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from google.oauth2.credentials import Credentials
 
-CHANNELS_MAP = {
-    "masharee": "REFRESH_TOKEN_MASHAREE",
-    "abaad": "REFRESH_TOKEN_ABAAD",
-    "masar": "REFRESH_TOKEN_MASAR"
-}
+def get_channel_service(channel_key: str):
+    client_id = os.getenv("YOUTUBE_CLIENT_ID")
+    client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
+    refresh_token = os.getenv(f"REFRESH_TOKEN_{channel_key}")
 
-CLIENT_ID = "814988815489-i0gen64eparrgsm67gp9mapqahf0or9p.apps.googleusercontent.com"
-CLIENT_SECRET = "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"
-
-def upload_to_youtube(channel_key, video_file, title, description):
-    channel_key = channel_key.lower().strip()
-    secret_env = CHANNELS_MAP.get(channel_key)
-    
-    refresh_token = (os.getenv(secret_env) or "").strip().strip('"\'')
-
-    if not refresh_token:
-        sys.exit(f"❌ خطأ: التوكن غير معرّف للقناة {channel_key} ({secret_env})!")
-
-    print(f"🔑 جاري تفويض الصلاحيات للقناة [{channel_key}]...")
-    
     creds = Credentials(
-        token=None,
+        None,
         refresh_token=refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        scopes=["https://www.googleapis.com/auth/youtube.upload"]
+        client_id=client_id,
+        client_secret=client_secret
     )
+    return build("youtube", "v3", credentials=creds)
 
-    creds.refresh(Request())
-    print("✅ تم التحقق من الصلاحيات وتجديد الجلسة بنجاح!")
+def upload_documentary(file_path: str, channel_key: str):
+    # قراءة العنوان والوصف المولدين تلقائياً
+    title = "وثائقي خاص"
+    description = "وثائقي شامل يستعرض أهم الحقائق والتحليلات المعمقة."
+    
+    if os.path.exists("video_meta.json"):
+        with open("video_meta.json", "r", encoding="utf-8") as f:
+            meta = json.load(f)
+            title = meta.get("title", title)
+            description = f"{meta.get('topic', '')}\n\n#وثائقي #معلومات #استكشاف #حقائق"
 
-    youtube = build("youtube", "v3", credentials=creds)
-
+    print(f"🚀 جاري رفع الوثائقي إلى [{channel_key}]: \"{title}\"...")
+    youtube = get_channel_service(channel_key)
+    
     body = {
         "snippet": {
-            "title": title[:95],
+            "title": title,
             "description": description,
+            "tags": ["وثائقي", "حقائق", "أسرار", "تاريخ", "علوم", "استكشاف"],
             "categoryId": "27"
         },
         "status": {
@@ -50,18 +45,18 @@ def upload_to_youtube(channel_key, video_file, title, description):
             "selfDeclaredMadeForKids": False
         }
     }
-
-    media = MediaFileUpload(video_file, chunksize=1024*1024*10, resumable=True)
-    request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
-
-    print(f"🚀 بدء الرفع الفعلي لملف {video_file} إلى يوتيوب...")
+    
+    media = MediaFileUpload(file_path, chunksize=10*1024*1024, resumable=True)
+    request = youtube.videos().insert(part=",".join(body.keys()), body=body, media_body=media)
+    
     response = None
     while response is None:
         status, response = request.next_chunk()
         if status:
-            print(f"[{channel_key}] تقدم الرفع: {int(status.progress() * 100)}%")
-
-    print(f"🎉 تم النشر بنجاح على يوتيوب! الرابط: https://youtu.be/{response.get('id')}")
+            print(f"  📊 نسبة الرفع: {int(status.progress() * 100)}%")
+            
+    print(f"🎉 تم النشر بنجاح على يوتيوب: https://youtu.be/{response['id']}")
 
 if __name__ == "__main__":
-    upload_to_youtube(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+    ch_key = sys.argv[1]  # ABAAD أو MASHAREE أو MASAR
+    upload_documentary("final_documentary.mp4", ch_key)
