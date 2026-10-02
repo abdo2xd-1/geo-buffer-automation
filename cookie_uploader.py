@@ -10,7 +10,7 @@ CHANNELS_MAP = {
 }
 
 def parse_netscape_cookies(cookies_text):
-    """تحويل الكوكيز من صيغة Netscape إلى الصيغة المتوافقة مع Playwright"""
+    """تحويل الكوكيز من تنسيق Netscape إلى تنسيق Playwright"""
     cookies = []
     for line in cookies_text.strip().split("\n"):
         line = line.strip()
@@ -35,17 +35,17 @@ def upload_to_youtube(channel_key, video_file, title, description):
     secret_name = CHANNELS_MAP.get(channel_key)
 
     if not secret_name:
-        raise ValueError(f"اسم القناة غير مدعوم: {channel_key}. الخيارات: abaad, masharee, masar")
+        raise ValueError(f"اسم القناة غير مدعوم: {channel_key}. المتاح: abaad, masharee, masar")
 
     cookies_raw = os.getenv(secret_name, "").strip()
     if not cookies_raw:
         raise ValueError(f"لم يتم العثور على المتغير {secret_name} داخل GitHub Secrets!")
 
     if not os.path.exists(video_file):
-        raise FileNotFoundError(f"ملف الفيديو غير موجود: {video_file}")
+        raise FileNotFoundError(f"ملف الفيديو غير موجود في المسار: {video_file}")
 
     print("=" * 60)
-    print(f"🚀 بدء الرفع لقناة: [{channel_key.upper()}]")
+    print(f"🚀 بدء عملية الرفع إلى قناة: [{channel_key.upper()}]")
     print(f"📁 اسم الملف: {video_file}")
     print(f"📌 عنوان الفيديو: {title}")
     print("=" * 60)
@@ -65,50 +65,53 @@ def upload_to_youtube(channel_key, video_file, title, description):
         page.goto("https://studio.youtube.com/channel/mine/videos/upload?d=ud", timeout=60000)
         time.sleep(7)
 
-        # رفع الفيديو
-        print("📤 سحب وإفلات ملف الفيديو...")
+        # رفع الملف
+        print("📤 جاري رفع ملف الفيديو...")
         file_input = page.locator('input[type="file"]')
         file_input.wait_for(state="attached", timeout=30000)
         file_input.set_input_files(video_file)
 
-        # تعبئة العنوان والوصف
+        # انتظار شاشة كتابة البيانات
         page.wait_for_selector("#textbox", timeout=45000)
         time.sleep(5)
-        print("✍️ ملء تفاصيل الفيديو...")
+
+        # كتابة العنوان والوصف
+        print("✍️ إدخال العنوان والوصف...")
         title_boxes = page.locator("#textbox")
         title_boxes.nth(0).fill(title[:95])
         title_boxes.nth(1).fill(description)
 
-        # تحديد غير مخصص للأطفال
+        # غير مخصص للأطفال
         time.sleep(2)
         not_for_kids = page.locator('tp-yt-paper-radio-button[name="VIDEO_MADE_FOR_KIDS_NOT_MFK"]')
         if not_for_kids.is_visible():
             not_for_kids.click()
 
-        # الخطوات التالية
+        # الضغط على زر التالي للمرور عبر شاشات الإعدادات
         for step in range(1, 4):
             time.sleep(3)
             next_btn = page.locator("#next-button")
             if next_btn.is_visible():
                 next_btn.click()
-                print(f"➡ المتابعة عبر خطوات التحقق ({step}/3)...")
+                print(f"➡ تخطي خطوة الإعدادات ({step}/3)...")
 
-        # اختيار نشر عام
+        # ضبط الفيديو على الوضع العام (Public)
         time.sleep(3)
         public_radio = page.locator('tp-yt-paper-radio-button[name="PUBLIC"]')
         if public_radio.is_visible():
             public_radio.click()
+            print("👁️ تم تحديد حالة الفيديو: عام (Public)")
 
-        # النقر على زر النشر النهائي
+        # الضغط على زر النشر النهائي
         time.sleep(3)
         done_btn = page.locator("#done-button")
         if done_btn.is_visible():
             done_btn.click()
-            print("✅ تم الضغط على زر النشر بنجاح!")
+            print("✅ تم النقر على زر النشر بنجاح!")
             time.sleep(15)
 
         browser.close()
-        print(f"🎉 اكتمل النشر على قناة [{channel_key.upper()}] بنجاح تام.")
+        print(f"🎉 اكتمل النشر على قناة [{channel_key.upper()}] بنجاح.")
 
 if __name__ == "__main__":
     ch = sys.argv[1] if len(sys.argv) > 1 else "masar"
