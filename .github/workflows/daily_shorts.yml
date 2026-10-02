@@ -1,15 +1,15 @@
-name: Publish Shorts
+name: Publish Daily Shorts
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # يتيح لك التشغيل اليدوي وقتما تحب
   schedule:
+    # يعمل تلقائياً كل يوم الساعة 3 عصراً بتوقيت جرينتش (5 مساءً بتوقيت مصر)
     - cron: '0 15 * * *'
 
 jobs:
   publish_shorts:
     runs-on: ubuntu-latest
-    # 1. إعطاء السيرفر مهلة 3 ساعات كاملة لإنهاء رندر القنوات الثلاث براحته
-    timeout-minutes: 180
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Code
@@ -20,13 +20,16 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-cjk
+
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
 
       - name: Run Shorts Publisher
-        # 2. ضمان عدم إيقاف خطوة الرندر والنشر عند الدقيقة 30
-        timeout-minutes: 180
         env:
           BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
