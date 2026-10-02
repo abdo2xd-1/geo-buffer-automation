@@ -1,7 +1,4 @@
-moviepy==1.0.3
-edge-tts
-requests
-pillow
-numpy
-arabic-reshaper
-python-bidi
+playwright>=1.40.0
+requests>=2.31.0
+google-genai>=0.1.1
+pillow>=10.0.0
