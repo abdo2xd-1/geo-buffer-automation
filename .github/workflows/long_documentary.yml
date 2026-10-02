@@ -1,4 +1,29 @@
-# 1. قناة أبعاد جغرافية
+name: Produce and Upload Documentaries
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 17 * * *'
+
+jobs:
+  run_pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
       - name: Produce & Upload - أبعاد جغرافية
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -10,7 +35,6 @@
           python long_documentary_publisher.py --channel abaad
           python api_uploader.py abaad documentary_abaad.mp4 "أبعاد جغرافية: صراع الممرات البحرية والتجارة الدولية" "تحقيق استقصائي يكشف أسرار المضائق والممرات الاستراتيجية. #أبعاد_جغرافية"
 
-      # 2. قناة مشاريع عملاقة
       - name: Produce & Upload - مشاريع عملاقة
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -22,7 +46,6 @@
           python long_documentary_publisher.py --channel masharee
           python api_uploader.py masharee documentary_masharee.mp4 "مشاريع عملاقة: معجزات هندسية تحدت قوانين الطبيعة" "وثائقي شامل يستعرض تفاصيل أضخم الإنشاءات الهندسية عالمياً. #مشاريع_عملاقة"
 
-      # 3. قناة مسار
       - name: Produce & Upload - مسار
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
