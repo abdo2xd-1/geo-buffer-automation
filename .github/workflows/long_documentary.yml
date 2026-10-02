@@ -1,6 +1,8 @@
 name: Produce and Upload Documentaries
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
   schedule:
     - cron: '0 17 * * *'
@@ -29,7 +31,6 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib requests
 
-      # خطوة الفحص السريع (تستغرق ثانيتين فقط لتشخيص أي خطأ في التوكنات)
       - name: Verify YouTube Tokens
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
@@ -40,7 +41,6 @@ jobs:
         run: |
           python -u verify_tokens.py
 
-      # إنتاج ونشر قناة أبعاد جغرافية
       - name: Produce & Upload - أبعاد جغرافية
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -52,7 +52,6 @@ jobs:
           python -u long_documentary_publisher.py --channel abaad
           python -u api_uploader.py abaad documentary_abaad.mp4 "أبعاد جغرافية: صراع الممرات البحرية والتجارة الدولية" "تحقيق استقصائي يكشف أسرار المضائق والممرات الاستراتيجية. #أبعاد_جغرافية"
 
-      # إنتاج ونشر قناة مشاريع عملاقة
       - name: Produce & Upload - مشاريع عملاقة
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -64,7 +63,6 @@ jobs:
           python -u long_documentary_publisher.py --channel masharee
           python -u api_uploader.py masharee documentary_masharee.mp4 "مشاريع عملاقة: معجزات هندسية تحدت قوانين الطبيعة" "وثائقي شامل يستعرض تفاصيل أضخم الإنشاءات الهندسية عالمياً. #مشاريع_عملاقة"
 
-      # إنتاج ونشر قناة مسار
       - name: Produce & Upload - مسار
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -73,5 +71,5 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           REFRESH_TOKEN_MASAR: ${{ secrets.REFRESH_TOKEN_MASAR }}
         run: |
-          python -u long_documentary_publisher.py --channel مسار
+          python -u long_documentary_publisher.py --channel masar
           python -u api_uploader.py masar documentary_masar.mp4 "مسار: خطوط التجارة وصناعة القوى العالمية" "وثائقي تحليلي استقصائي يسلط الضوء على خفايا سلاسل الإمداد ومستقبل الاقتصاد. #مسار"
