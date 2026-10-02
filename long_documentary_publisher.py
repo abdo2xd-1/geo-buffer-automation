@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 
-# تثبيت المكتبات الداعمة تلقائياً إن لم تكن متوفرة
+# تثبيت المكتبات الاحتياطية تلقائياً
 try:
     import edge_tts
 except ImportError:
@@ -26,40 +26,56 @@ except ImportError:
 
 import google.generativeai as genai
 
-# --- 1. الإعدادات واختيار نموذج الذكاء الاصطناعي النشط ---
+# --- 1. الإعدادات واختيار نموذج Gemini الفعال ---
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 PEXELS_KEY = os.getenv("PEXELS_API_KEY")
 
 genai.configure(api_key=GEMINI_KEY)
 
 def get_active_model():
-    """اختيار نموذج متاح وفعال لحسابك تلقائياً"""
+    """اختيار نموذج متاح وفعال تلقائياً لحسابك وتجربته فوراً"""
     candidates = [
+        "gemini-3.8-flash",
         "gemini-2.5-flash",
         "gemini-2.0-flash",
         "gemini-1.5-flash-latest",
         "gemini-1.5-pro",
         "gemini-pro"
     ]
+    for c in candidates:
+        try:
+            m = genai.GenerativeModel(c)
+            # تجربة استدعاء سريع للتأكد من أن النموذج متاح وغير محظور
+            m.generate_content("test")
+            print(f"🎯 تم تفعيل النموذج المعتمد بنجاح: [{c}]")
+            return m
+        except Exception as e:
+            print(f"⚠️ النموذج [{c}] غير متاح: {e}")
+            continue
+
+    # محاولة فحص قائمة النماذج الداعمة المتاحة في الحساب
     try:
-        available = [
-            m.name.replace("models/", "")
-            for m in genai.list_models()
-            if "generateContent" in m.supported_generation_methods
-        ]
-        for c in candidates:
-            if c in available:
-                print(f"🎯 تم تفعيل النموذج المعتمد: [{c}]")
-                return genai.GenerativeModel(c)
-        if available:
-            return genai.GenerativeModel(available[0])
+        for m_info in genai.list_models():
+            if "generateContent" in m_info.supported_generation_methods:
+                model_name = m_info.name.replace("models/", "")
+                try:
+                    m = genai.GenerativeModel(model_name)
+                    m.generate_content("test")
+                    print(f"🎯 تم تفعيل النموذج من القائمة المتاحة: [{model_name}]")
+                    return m
+                except Exception:
+                    continue
     except Exception as e:
-        print(f"⚠️ جاري استخدام النموذج الافتراضي: {e}")
-    return genai.GenerativeModel("gemini-2.0-flash")
+        print(f"⚠️ تعذر فحص قائمة النماذج: {e}")
+
+    return genai.GenerativeModel("gemini-3.8-flash")
 
 model = get_active_model()
 VOICE_NAME = "ar-EG-ShakirNeural"  # صوت بشري وثائقي طبيعي
-MIN_REQUIRED_SECONDS = 1200        # الحد الأدنى الصارم: 20 دقيقة (1200 ثانية)
+
+# ضبط النطاق الزمني: الحد الأدنى 10 دقائق (600 ثانية)، والحد الأقصى تحت 15 دقيقة (870 ثانية)
+MIN_DURATION_SECONDS = 600   # 10 دقائق كحد أدنى
+MAX_SAFE_SECONDS = 870       # 14.5 دقيقة كحد أقصى آمن لتجنب حظر يوتيوب
 
 def clean_arabic_text(text: str) -> str:
     """تنظيف النص من الرموز والماركداون لضمان نطق سليم"""
@@ -77,7 +93,7 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
-# --- 2. توليد فكرة عشوائية غير محصورة ---
+# --- 2. توليد فكرة عشوائية غير مقيدة ---
 def get_random_topic(channel_name: str) -> dict:
     print(f"🎲 جاري ابتكار فكرة وثائقية عشوائية جديدة لقناة [{channel_name}]...")
     prompt = f"""
@@ -108,74 +124,58 @@ def get_random_topic(channel_name: str) -> dict:
     print(f"  💡 العنوان المختار: {data['title']}")
     return data
 
-# --- 3. توليد سيناريو ضخم (+3000 كلمة) بطلبين لتجنب قيود الـ API ---
-def generate_long_script(title: str, topic: str) -> str:
-    print(f"✍️ جاري كتابة السرد الوثائقي المطول لضمان تخطي 20 دقيقة...")
+# --- 3. توليد سيناريو وثائقي (من 10 إلى 14 دقيقة: ~1600 كلمة) ---
+def generate_medium_script(title: str, topic: str) -> str:
+    print(f"✍️ جاري صياغة السرد الوثائقي المتوازن (الهدف: 10 إلى 14 دقيقة)...")
     
-    script_parts = []
-    
-    prompt_part1 = f"""
+    prompt = f"""
     أنت كبير كتّاب الأفلام الوثائقية التلفزيونية.
-    موضوع العمل: "{title}".
+    عنوان العمل: "{title}".
     الوصف: "{topic}".
     
-    المطلوب: اكتب النصف الأول من السيناريو الوثائقي (المقدمة، الجذور التاريخية والبدايات، والحقائق غير المعلنة ونقاط التحول).
+    المطلوب: كتابة سيناريو وثائقي كامل وشامل (مقدمة مشوقة، 4 محاور سردية عميقة بالأدلة والأسرار، وخاتمة فلسفية ملهمة).
+    
     شروط ملزمة:
-    1. اكتب نصاً سردياً مطولاً جداً لا يقل عن 1500 كلمة باللغة العربية الفصحى الفخمة.
-    2. اكتب فقط ما ينطقه الراوي بصوته دون أي توجيهات إخراجية أو أسماء للمشاهد.
+    1. اكتب نصاً سردياً مطولاً يتراوح بدقة بين 1500 إلى 1700 كلمة باللغة العربية الفصحى الفخمة (ليغطي تعليقاً صوتياً بين 11 و 13 دقيقة).
+    2. اكتب فقط النص المقروء الذي ينطقه المعلق الصوتي دون وضع أي توجيهات إخراجية أو كلمات مثل (مشهد، راوي، فاصل، موسيقى).
+    3. أسلوب سلس ومترابط ومفعم بالحقائق والمعلومات الموثقة.
     """
     
-    prompt_part2 = f"""
-    أنت كبير كتّاب الأفلام الوثائقية التلفزيونية.
-    موضوع العمل: "{title}".
-    الوصف: "{topic}".
-    
-    المطلوب: اكتب النصف الثاني والمتمم للسيناريو (التحديات الكبرى، الأبعاد الاستراتيجية، الأسرار العميقة، والخاتمة الفلسفية).
-    شروط ملزمة:
-    1. اكتب نصاً سردياً مطولاً جداً لا يقل عن 1500 كلمة باللغة العربية الفصحى الفخمة.
-    2. اكتب فقط ما ينطقه الراوي بصوته مباشرة.
-    """
-    
-    for idx, p in enumerate([prompt_part1, prompt_part2], 1):
-        success = False
-        for attempt in range(3):
-            try:
-                print(f"  ⏳ جاري صياغة القسم {idx} من الوثائقي عبر الذكاء الاصطناعي...")
-                res = model.generate_content(p)
-                if res.text:
-                    cleaned_text = clean_arabic_text(res.text.strip())
-                    if len(cleaned_text.split()) > 250:
-                        script_parts.append(cleaned_text)
-                        print(f"  ✅ تم إنجاز القسم {idx} بنجاح ({len(cleaned_text.split())} كلمة)!")
-                        success = True
-                        time.sleep(4)
-                        break
-            except Exception as err:
-                print(f"  ⚠️ خطأ محاولة توليد القسم {idx}: {err}")
-                time.sleep(5)
-                
-        if not success:
-            print(f"  ⚠️ استخدام السرد الاحتياطي للقسم {idx} لضمان اكتمال المدة.")
-            fallback = (
-                f"في عمق التاريخ وحنايا الوجود الإنساني، تقف شواهد {title} كدليل راسخ على قدرة العقل البشري على مجابهة المجهول وتجاوز الحدود التقليدية. "
-                "لقد انطلقت هذه الرحلة من فكرة بسيطة سرعان ما تحولت إلى واقع فرض نفسه على مجريات الأحداث، حيث تلاقت الإرادة مع التحديات الطبيعية والتقنية المعقدة. "
-                "تظهر السجلات والوثائق المحفوظة أن ما خفي من تفاصيل كان يفوق بكثير ما تم إعلانه في ذلك الحين، لتكشف لنا الدراسات المتأخرة أسراراً حاسمة. "
-                "إن تفحص الأرقام الدقيقة والمسارات التي سلكها الرواد يبرز بوضوح كيف تشكلت موازين جديدة أثرت على المنطقة والعالم بأسره دون رجعة. "
-            ) * 12
-            script_parts.append(clean_arabic_text(fallback))
+    script_text = ""
+    for attempt in range(3):
+        try:
+            print(f"  ⏳ جاري صياغة السيناريو عبر الذكاء الاصطناعي...")
+            res = model.generate_content(prompt)
+            if res.text:
+                cleaned = clean_arabic_text(res.text.strip())
+                if len(cleaned.split()) >= 900:
+                    script_text = cleaned
+                    print(f"  ✅ تم إنتاج السيناريو بنجاح ({len(cleaned.split())} كلمة)!")
+                    break
+        except Exception as e:
+            print(f"  ⚠️ خطأ في التوليد ({e})، إعادة المحاولة...")
+            time.sleep(4)
+            
+    if not script_text:
+        print("  ⚠️ استخدام سيناريو احتياطي متوازن...")
+        fallback = (
+            f"في عمق التاريخ وحنايا الوجود الإنساني، تقف شواهد {title} كدليل راسخ على قدرة العقل البشري على مجابهة المجهول وتجاوز الحدود التقليدية. "
+            "لقد انطلقت هذه الرحلة من فكرة بسيطة سرعان ما تحولت إلى واقع فرض نفسه على مجريات الأحداث، حيث تلاقت الإرادة مع التحديات الطبيعية والتقنية المعقدة. "
+            "تظهر السجلات والوثائق المحفوظة أن ما خفي من تفاصيل كان يفوق بكثير ما تم إعلانه في ذلك الحين، لتكشف لنا الدراسات المتأخرة أسراراً حاسمة. "
+            "إن تفحص الأرقام الدقيقة والمسارات التي سلكها الرواد يبرز بوضوح كيف تشكلت موازين جديدة أثرت على مسار الأحداث الإنسانية دون رجعة. "
+        ) * 7
+        script_text = clean_arabic_text(fallback)
+        
+    return script_text
 
-    full_script = "\n\n".join(script_parts)
-    print(f"📊 إجمالي حجم السيناريو: {len(full_script.split())} كلمة.")
-    return full_script
-
-# --- 4. توليد الصوت البشري المجزأ وحمايته من التوقف ---
+# --- 4. توليد الصوت البشري المجزأ وضمان مدة (10 - 14 دقيقة) ---
 async def generate_chunk_edge_tts(chunk_text: str, output_file: str):
     comm = edge_tts.Communicate(chunk_text, VOICE_NAME, rate="-4%")
     await comm.save(output_file)
 
 def build_guaranteed_audio(title: str, topic: str) -> float:
-    script_text = generate_long_script(title, topic)
-    print(f"🎙️ جاري توليد التعليق الصوتي البشري...")
+    script_text = generate_medium_script(title, topic)
+    print(f"🎙️ جاري توليد التعليق الصوتي البشري عبر ({VOICE_NAME})...")
     
     words = script_text.split()
     chunk_size = 140
@@ -207,7 +207,7 @@ def build_guaranteed_audio(title: str, topic: str) -> float:
             except Exception:
                 pass
                 
-        if idx % 5 == 0 or idx == len(chunks):
+        if idx % 4 == 0 or idx == len(chunks):
             print(f"  🔊 اكتمل تسجيل {idx}/{len(chunks)} جزءاً من الصوت...")
 
     if part_files:
@@ -221,10 +221,10 @@ def build_guaranteed_audio(title: str, topic: str) -> float:
     duration = get_audio_duration("narration.mp3")
     print(f"🎧 مدة الصوت الحالية: {duration / 60:.2f} دقيقة ({duration:.0f} ثانية)")
 
-    # ضمان تخطي 20 دقيقة
-    while duration < MIN_REQUIRED_SECONDS:
-        print(f"⚠️ الصوت الحالي {duration / 60:.1f} دقيقة؛ جاري إضافة ملحق وثائقي لتجاوز 20 دقيقة...")
-        extra_prompt = f"اكتب فصلاً وثائقياً تكميلياً موسعاً (800 كلمة) باللغة العربية الفصحى يحلل بعمق زوايا جديدة حول: {title}."
+    # إذا كان أقل من 10 دقائق (600 ثانية)، نمدده بإضافة جزء تكميلي
+    while duration < MIN_DURATION_SECONDS:
+        print(f"⚠️ الصوت الحالي {duration / 60:.1f} دقيقة (أقل من 10 دقائق)؛ جاري إضافة جزء إضافي...")
+        extra_prompt = f"اكتب فقرة وثائقية تكميلية مطولة (350 كلمة) باللغة العربية الفصحى تضيف تحليلاً عميقاً حول: {title}."
         extra_text = clean_arabic_text(model.generate_content(extra_prompt).text.strip())
         
         try:
@@ -233,24 +233,31 @@ def build_guaranteed_audio(title: str, topic: str) -> float:
             gtts.gTTS(text=extra_text, lang="ar").save("extra.mp3")
             
         with open("concat_extra.txt", "w", encoding="utf-8") as f:
-            f.write("file 'narration.mp3'\nfile 'extra.mp3'\n")
+            f.write(f"file '{os.path.abspath('narration.mp3')}'\nfile '{os.path.abspath('extra.mp3')}'\n")
         subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "concat_extra.txt", "-c", "copy", "narration_final.mp3"], check=True)
         os.replace("narration_final.mp3", "narration.mp3")
         duration = get_audio_duration("narration.mp3")
-        print(f"  📈 المدة بعد التمديد: {duration / 60:.2f} دقيقة")
+        print(f"  📈 المدة المحدثة: {duration / 60:.2f} دقيقة")
 
-    print(f"✅ تم تأكيد استيفاء المدة المطلوبة بنجاح: {duration / 60:.2f} دقيقة!")
+    # إذا تجاوز 14.5 دقيقة بالخطأ، نقصه بأمان ليبقى تحت حد الـ 15 دقيقة
+    if duration > MAX_SAFE_SECONDS:
+        print(f"✂️ تقليص مدة الصوت لتصبح {MAX_SAFE_SECONDS / 60:.1f} دقيقة بالضبط لتفادي قيود يوتيوب...")
+        subprocess.run(["ffmpeg", "-y", "-i", "narration.mp3", "-t", str(MAX_SAFE_SECONDS), "-c", "copy", "narration_trimmed.mp3"], check=True)
+        os.replace("narration_trimmed.mp3", "narration.mp3")
+        duration = get_audio_duration("narration.mp3")
+
+    print(f"✅ تم تأكيد مدة الصوت المتوازنة بنجاح: {duration / 60:.2f} دقيقة (بين 10 و 14 دقيقة)!")
     return duration
 
-# --- 5. جلب وتكرار مشاهد Pexels لسد كامل المدة ---
+# --- 5. جلب وتكرار مشاهد Pexels لتغطية المدة ---
 def prepare_video_footage(keywords: list, target_duration: float, output_dir: str = "clips") -> str:
-    print(f"🎥 جاري جلب المشاهد البصرية لتغطية مدة {target_duration / 60:.1f} دقيقة...")
+    print(f"🎥 جاري جلب المشاهد لتغطية مدة {target_duration / 60:.1f} دقيقة...")
     os.makedirs(output_dir, exist_ok=True)
     headers = {"Authorization": PEXELS_KEY}
     
     raw_clips = []
     for kw in keywords:
-        url = f"https://api.pexels.com/videos/search?query={kw}&per_page=12&orientation=landscape"
+        url = f"https://api.pexels.com/videos/search?query={kw}&per_page=10&orientation=landscape"
         try:
             res = requests.get(url, headers=headers, timeout=20).json()
             for v in res.get("videos", []):
@@ -261,7 +268,7 @@ def prepare_video_footage(keywords: list, target_duration: float, output_dir: st
         except Exception:
             continue
             
-    unique_links = list(set(raw_clips))[:15]
+    unique_links = list(set(raw_clips))[:12]
     downloaded_files = []
     
     for idx, link in enumerate(unique_links, 1):
@@ -278,7 +285,7 @@ def prepare_video_footage(keywords: list, target_duration: float, output_dir: st
             
     playlist_path = "full_playlist.txt"
     with open(playlist_path, "w", encoding="utf-8") as f:
-        loops_needed = int((target_duration // 100) + 5)
+        loops_needed = int((target_duration // 100) + 4)
         playlist = []
         for _ in range(loops_needed):
             shuffled = downloaded_files.copy()
@@ -292,7 +299,7 @@ def prepare_video_footage(keywords: list, target_duration: float, output_dir: st
 
 # --- 6. رندر ومونتاج FFmpeg المحمي ضد التجمد وتكرار الإطارات ---
 def render_long_documentary(playlist_path: str, audio_path: str, output_path: str = "final_documentary.mp4"):
-    print("⚙️ جاري دمج ومونتاج الوثائقي الطويل (معالجة سريعة وثابتة الإطارات)...")
+    print("⚙️ جاري دمج ومونتاج الوثائقي عبر FFmpeg (رندر سريع وثابت الإطارات)...")
     
     cmd = [
         "ffmpeg", "-y",
@@ -311,7 +318,7 @@ def render_long_documentary(playlist_path: str, audio_path: str, output_path: st
 
 # --- 7. رفع الوثائقي إلى يوتيوب بالتجزئة ---
 def upload_to_youtube(file_path: str, channel_key: str, title: str, description: str):
-    print(f"🚀 جاري رفع الوثائقي الطويل إلى يوتيوب [{channel_key}]: \"{title}\"...")
+    print(f"🚀 جاري رفع الوثائقي إلى يوتيوب [{channel_key}]: \"{title}\"...")
     
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
@@ -356,10 +363,10 @@ if __name__ == "__main__":
     channel_names = {"ABAAD": "أبعاد جغرافية", "MASHAREE": "مشاريع عملاقة", "MASAR": "مسار"}
     channel_title = channel_names.get(channel_key, channel_key)
     
-    # 1. فكرة عشوائية
+    # 1. فكرة عشوائية فريدة
     meta = get_random_topic(channel_title)
     
-    # 2. بناء الصوت البشري الإجباري (+20 دقيقة)
+    # 2. بناء الصوت البشري (بين 10 إلى 14 دقيقة بدقة)
     duration = build_guaranteed_audio(meta["title"], meta["topic"])
     
     # 3. تجهيز المشاهد الممتدة
@@ -368,5 +375,5 @@ if __name__ == "__main__":
     # 4. الرندر السريع والثابت
     render_long_documentary(playlist, "narration.mp3", "final_documentary.mp4")
     
-    # 5. الرفع إلى يوتيوب
+    # 5. الرفع إلى يوتيوب ونشره كفيديو عام فوراً
     upload_to_youtube("final_documentary.mp4", channel_key, meta["title"], meta["topic"])
