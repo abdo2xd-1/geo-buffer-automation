@@ -1,12 +1,12 @@
-name: Generate 30-Min Long Documentary
+name: Produce and Upload Documentaries
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 18 * * 0,3'
+    - cron: '0 17 * * *' # يومياً الساعة 7:00 مساءً بتوقيت مصر
 
 jobs:
-  build_documentary:
+  run_pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -19,27 +19,42 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install System Dependencies
+      - name: Install System Packages
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-cjk
 
-      - name: Install Python Dependencies
+      - name: Install Python Libraries & Playwright
         run: |
-          pip install --upgrade pip
-          pip install "moviepy==1.0.3" edge-tts requests pillow numpy arabic-reshaper python-bidi
+          pip install -r requirements.txt
+          playwright install chromium --with-deps
 
-      - name: Produce 30-Min Documentary
-        timeout-minutes: 360
+      # 1. قناة أبعاد جغرافية
+      - name: Produce & Upload - أبعاد جغرافية
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          COOKIES_ABAAD: ${{ secrets.COOKIES_ABAAD }}
         run: |
-          python long_documentary_publisher.py
+          python long_documentary_publisher.py --channel abaad
+          python cookie_uploader.py abaad documentary_abaad.mp4 "أبعاد جغرافية: صراع الممرات البحرية والتجارة الدولية" "تحقيق استقصائي يكشف أسرار المضائق والممرات الاستراتيجية وتأثيرها على العالم. #أبعاد_جغرافية"
 
-      - name: Upload Video as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Full-30Min-Documentary
-          path: documentary_30min.mp4
-          retention-days: 3
+      # 2. قناة مشاريع عملاقة
+      - name: Produce & Upload - مشاريع عملاقة
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          COOKIES_MASHAREE: ${{ secrets.COOKIES_MASHAREE }}
+        run: |
+          python long_documentary_publisher.py --channel masharee
+          python cookie_uploader.py masharee documentary_masharee.mp4 "مشاريع عملاقة: معجزات هندسية تحدت قوانين الطبيعة" "وثائقي شامل يستعرض تفاصيل أضخم الإنشاءات المعمارية وأعقد المشاريع الهندسية عالمياً. #مشاريع_عملاقة"
+
+      # 3. قناة مسار
+      - name: Produce & Upload - مسار
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          COOKIES_MASAR: ${{ secrets.COOKIES_MASAR }}
+        run: |
+          python long_documentary_publisher.py --channel masar
+          python cookie_uploader.py masar documentary_masar.mp4 "مسار: خطوط التجارة وصناعة القوى العالمية" "وثائقي تحليلي استقصائي يسلط الضوء على خفايا سلاسل الإمداد ومستقبل الاقتصاد الدولي. #مسار"
