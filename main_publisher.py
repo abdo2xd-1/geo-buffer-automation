@@ -26,16 +26,16 @@ from moviepy.editor import (
 )
 
 # ==============================================================================
-# 1. المفاتيح والقنوات والهويات الوثائقية
+# 1. المفاتيح والقنوات والهويات المنفصلة تماماً
 # ==============================================================================
 BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN", "").strip()
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
 DEFAULT_CHANNELS = [
-    "6abacd06ea19ca0bde180ef9", # أبعاد جغرافية
-    "6abace11ea19ca0bde181821", # مشاريع عملاقة
-    "6abace7bea19ca0bde181dff"  # مسار
+    "6abacd06ea19ca0bde180ef9", # القناة 1: أبعاد جغرافية
+    "6abace11ea19ca0bde181821", # القناة 2: مشاريع عملاقة
+    "6abace7bea19ca0bde181dff"  # القناة 3: مسار
 ]
 
 env_channel_str = os.getenv("BUFFER_CHANNEL_IDS", "").strip()
@@ -50,19 +50,25 @@ NICHE_PROFILES = {
         "voice": "ar-EG-ShakirNeural",
         "rate": "+20%",
         "badge": "أبعاد جغرافية | أسرار الكوكب",
-        "handle": "@AbaadGeo"
+        "handle": "@AbaadGeo",
+        "cta_text": "اشترك وفعل الجرس لأسرار الجغرافيا 🔔",
+        "voice_cta": "اشترك في القناة وفعل الجرس علشان يوصلك كل لغز جغرافي بنكشفه!"
     },
     "مشاريع عملاقة": {
         "voice": "ar-EG-ShakirNeural",
         "rate": "+18%",
         "badge": "مشاريع عملاقة | معجزات هندسية",
-        "handle": "@MegaProjects"
+        "handle": "@MegaProjects",
+        "cta_text": "اشترك بالقناة لمعجزات الهندسة 🔔",
+        "voice_cta": "اشترك وفعل الجرس معانا علشان تتابع أضخم مشاريع العالم أول بأول!"
     },
     "مسار": {
         "voice": "ar-EG-ShakirNeural",
         "rate": "+18%",
         "badge": "مسار | أسرار التجارة العالمية",
-        "handle": "@MasarFlow"
+        "handle": "@MasarFlow",
+        "cta_text": "اشترك وفعل الجرس لأسرار الملاحة 🔔",
+        "voice_cta": "اشترك في مسار واضغط لايك علشان متفوتش أسرار التجارة والنفط القادمة!"
     }
 }
 
@@ -70,12 +76,13 @@ NICHE_NAMES = list(NICHE_PROFILES.keys())
 HISTORY_FILE = "published_history.json"
 
 # ==============================================================================
-# 2. حزمة المؤثرات والموسيقى وأصوات البيئة (Foley Suite)
+# 2. حزمة المؤثرات الصوتية والموسيقى (مع صوت الجرس والاشتراك)
 # ==============================================================================
 BGM_TRACKS = [
     "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=dark-mystery-trailer-111586.mp3",
     "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8bbf72242.mp3?filename=suspense-cinematic-ambient-109012.mp3"
 ]
+SFX_BELL_URL = "https://cdn.pixabay.com/download/audio/2022/03/24/audio_349f7ba3ad.mp3?filename=service-bell-ding-103348.mp3"
 SFX_WHOOSH_URL = "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3527e30ec.mp3?filename=whoosh-6316.mp3"
 SFX_IMPACT_URL = "https://cdn.pixabay.com/download/audio/2021/08/04/audio_12b0c7443c.mp3?filename=cinematic-boom-impact-114457.mp3"
 SFX_POP_URL = "https://cdn.pixabay.com/download/audio/2022/03/24/audio_c29f6004b9.mp3?filename=pop-39222.mp3"
@@ -88,6 +95,7 @@ FOLEY_MACHINERY_URL = "https://cdn.pixabay.com/download/audio/2022/01/18/audio_8
 
 def ensure_audio_assets():
     assets = {
+        "sfx_bell.mp3": SFX_BELL_URL,
         "sfx_whoosh.mp3": SFX_WHOOSH_URL,
         "sfx_impact.mp3": SFX_IMPACT_URL,
         "sfx_pop.mp3": SFX_POP_URL,
@@ -106,12 +114,9 @@ def ensure_audio_assets():
                 if r.status_code == 200:
                     with open(filename, "wb") as f:
                         f.write(r.content)
-            except Exception as e:
-                print(f"⚠️ تعذر تنزيل {filename}: {e}")
+            except Exception:
+                pass
 
-# ==============================================================================
-# 3. سجل المواضيع واختبار الـ A/B Testing
-# ==============================================================================
 def load_history():
     if os.path.exists(HISTORY_FILE):
         try:
@@ -133,21 +138,20 @@ def save_history(niche, title, strategy):
         pass
 
 # ==============================================================================
-# 4. محرك الـ High-CPM والـ A/B Testing بالذكاء الاصطناعي
+# 3. بنك طوارئ متنوع ومنفصل بالكامل لكل قناة
 # ==============================================================================
-FALLBACK_TOPICS_POOL = {
+DIVERSE_TOPICS_POOL = {
     "أبعاد جغرافية": [
         {
             "title_a": "[لغز غامض] بحيرة سرية في إفريقيا تحول الطيور لحجارة فوراً !! 😱⚡",
             "title_b": "[صدمة 60°] مياه قلوية كاوية تدمر كل من يقترب منها في دقائق !! ⚠️🔥",
-            "desc": "أغرب ظاهرة على وجه الأرض ترتبط بأمن الموارد وسلاسل التوريد البيئية النادرة!\n\n🔴 تابع الوثائقي الكامل في قناتنا: https://youtube.com/@AbaadGeo\n#أبعاد_جغرافية #غرائب #حقائق_مرعبة #اقتصاد_المناخ #Shorts",
-            "pinned_comment": "💬 لو عُرض عليك مليون دولار لتعيش هناك أسبوعاً كاملاً بمفردك.. توافق أم ترفض؟ اكتب رأيك بالتعليقات!",
+            "desc": "أغرب ظواهر كوكب الأرض وسر بحيرة النطرون الصادمة.\n\n🔴 اشترك الآن وفعل الجرس لمتابعة أسرار الجغرافيا!\n#أبعاد_جغرافية #غرائب #حقائق_مرعبة #Shorts",
+            "pinned_comment": "💬 لو اتعرض عليك مليون دولار لتعيش هناك أسبوعاً كاملاً بمفردك.. توافق أم ترفض؟ شاركنا برأيك!",
             "scenes": [
-                {"hook": "تخيل إن في بحيرة سرية في إفريقيا، أي طائر يلمس ميتها بيتحول لحجر فوراً!", "part1": "بحيرة النطرون", "part2": "بتحول الكائنات لحجر!", "coords": "02°25'S 36°00'E", "location_tag": "تنزانيا - إفريقيا", "query": "red lake volcanic thermal", "has_callout": True, "has_map_highlight": True},
-                {"hook": "الموضوع مش سحر، حرارة المية بتوصل لستين درجة ومليانة أملاح كاوية بتحجر الأجسام!", "part1": "حرارة 60 مئوية", "part2": "أملاح قلوية كاوية!", "coords": "02°25'S 36°00'E", "location_tag": "الوادي المتصدع", "query": "boiling water volcanic thermal"},
-                {"hook": "وفي أبرد قرية بروسيا، الحرارة بتنزل لواحد وسبعين تحت الصفر والأنفاس بتتجمد بثانية!", "part1": "برودة -71 مئوية", "part2": "الرموش تتجمد بثانية!", "coords": "63°27'N 142°47'E", "location_tag": "أويمياكون - روسيا", "query": "frozen siberia blizzard snow", "has_map_highlight": True},
-                {"hook": "وحفرة بوابة جهنم في آسيا، مشتعلة بنيران غازية مستمرة وما انطفتش من خمسين سنة!", "part1": "بوابة جهنم", "part2": "مشتعلة من 50 سنة!", "coords": "40°15'N 58°26'E", "location_tag": "صحراء قره قوم", "query": "fire pit flames desert dark", "has_scale": True},
-                {"hook": "لو اتعرض عليك مليون دولار لتعيش هناك أسبوع.. توافق؟ لأن سر الرعب ده بدأ مع...", "part1": "مليون $ للمغامرة؟", "part2": "اكتب رأيك الآن!", "coords": "GLOBAL RADAR", "location_tag": "كوكب الأرض", "query": "space earth cinematic night"}
+                {"hook": "تخيل إن في بحيرة سرية في إفريقيا، أي طائر يلمس ميتها بيتحول لحجر فوراً!", "part1": "بحيرة النطرون", "part2": "تحول الكائنات لحجر!", "coords": "02°25'S 36°00'E", "location_tag": "تنزانيا", "query": "volcanic lake red water steam aerial", "has_callout": True, "has_map_highlight": True},
+                {"hook": "الموضوع مش سحر، حرارة المية بتوصل لستين درجة ومليانة أملاح كاوية بتحجر الأجسام!", "part1": "حرارة 60 مئوية", "part2": "أملاح قلوية كاوية!", "coords": "02°25'S 36°00'E", "location_tag": "الوادي المتصدع", "query": "boiling thermal volcanic waters"},
+                {"hook": "وفي أبرد قرية بروسيا، الحرارة بتنزل لواحد وسبعين تحت الصفر والأنفاس بتتجمد بثانية!", "part1": "برودة -71 مئوية", "part2": "الأنفاس تتجمد بثانية!", "coords": "63°27'N 142°47'E", "location_tag": "أويمياكون", "query": "siberia extreme blizzard frozen", "has_map_highlight": True},
+                {"hook": "تفتكر إيه هو المكان الأكثر رعباً على كوكبنا؟ اكتب رأيك في التعليقات!", "part1": "ما المكان الأخطر؟", "part2": "اكتب رأيك الآن!", "coords": "GLOBAL RADAR", "location_tag": "كوكب الأرض", "query": "planet earth from space dark"}
             ]
         }
     ],
@@ -155,14 +159,13 @@ FALLBACK_TOPICS_POOL = {
         {
             "title_a": "[وحش ميكانيكي] أضخم آلة صنعتها البشرية حفرت تحت قاع البحر !! 🏗️😱",
             "title_b": "[استثمار بالمليارات] آلة حفر أنفاق تزن 7000 طن غيرت بنية التجارة العالمية !! 💰🏗️",
-            "desc": "استثمارات البنية التحتية العملاقة وسلاسل الإمداد العالمية التي تحرك اقتصاد الدول الكبرى!\n\n🔴 شاهد قائمة المشاريع السيادية كاملة في قناتنا: https://youtube.com/@MegaProjects\n#مشاريع_عملاقة #هندسة #استثمارات_المليارات #بنية_تحتية #Shorts",
-            "pinned_comment": "💬 هل ترى أن ضخ تريليونات الدولارات في هذه المشاريع العملاقة يستحق التكلفة؟ اكتب رأيك بالتعليقات!",
+            "desc": "أضخم آلات حفر الأنفاق في العالم ومعجزات الهندسة الثقيلة.\n\n🔴 اشترك وفعل الجرس لمتابعة أضخم المشاريع الإنشائية!\n#مشاريع_عملاقة #هندسة #بنية_تحتية #Shorts",
+            "pinned_comment": "💬 هل ترى أن ضخ مليارات الدولارات في هذه الآلات العملاقة يستحق التكلفة؟ شاركنا بالتعليقات!",
             "scenes": [
-                {"hook": "أنت متخيل إن أضخم وحش ميكانيكي صنعته البشرية وزنه بيعادل سبعة آلاف طن؟", "part1": "وحش ميكانيكي خارق", "part2": "وزنه 7000 طن!", "coords": "47°36'N 122°19'W", "location_tag": "سياتل - الولايات المتحدة", "query": "tunnel boring machine industrial", "has_scale": True, "has_map_highlight": True},
-                {"hook": "الآلة دي بتفتت صخور الجبال وبتثبت جدران الخرسانة تحت قاع الأرض بنفس الدقيقة!", "part1": "تفتت صخور الجبال", "part2": "وتبني جدار خرسانة!", "coords": "47°36'N 122°19'W", "location_tag": "أنفاق النقل السريع", "query": "underground cave excavation drill"},
-                {"hook": "وجسر ميلاو في فرنسا، أعمدته أعلى من برج إيفل، والغيوم بتمر من تحت العربيات!", "part1": "أعلى من برج إيفل", "part2": "الغيوم تعبر تحته!", "coords": "44°05'N 03°01'E", "location_tag": "ميلاو - فرنسا", "query": "huge bridge clouds aerial height", "has_callout": True, "has_map_highlight": True},
-                {"hook": "وهولندا بنت بوابات حديدية جبارة في قلب البحر بتحمي استثمارات مدن كاملة من الغرق!", "part1": "بوابات محيط عملاقة", "part2": "تحمي مدن كاملة!", "coords": "51°39'N 03°43'E", "location_tag": "مشروع الدلتا - هولندا", "query": "ocean storm sea wall barrier"},
-                {"hook": "تفتكر المشاريع دي هتقدر تحمينا للأبد؟ شاركنا رأيك لأن الفكرة بدأت مع أول تصميم لـ...", "part1": "هل تحمينا للأبد؟", "part2": "اكتب رأيك الآن!", "coords": "GLOBAL RADAR", "location_tag": "المعجزات الهندسية", "query": "modern skyscraper construction drone"}
+                {"hook": "أنت متخيل إن أضخم وحش ميكانيكي صنعته البشرية وزنه بيعادل سبعة آلاف طن؟", "part1": "وحش ميكانيكي خارق", "part2": "وزنه 7000 طن!", "coords": "47°36'N 122°19'W", "location_tag": "سياتل", "query": "tunnel boring machine construction", "has_scale": True, "has_map_highlight": True},
+                {"hook": "الآلة دي بتفتت صخور الجبال وبتثبت جدران الخرسانة تحت قاع الأرض بنفس الدقيقة!", "part1": "تفتت الصخور فوراً", "part2": "وتبني جدران خرسانية!", "coords": "47°36'N 122°19'W", "location_tag": "أنفاق النقل السريع", "query": "underground cave drilling industrial"},
+                {"hook": "وجسر ميلاو في فرنسا، أعمدته أعلى من برج إيفل والغيوم بتمر من تحت العربيات!", "part1": "أعلى من برج إيفل", "part2": "السحب تعبر تحته!", "coords": "44°05'N 03°01'E", "location_tag": "فرنسا", "query": "high suspension bridge clouds aerial", "has_callout": True, "has_map_highlight": True},
+                {"hook": "تفتكر البشر يقدروا يبنوا معجزات أكبر من كده قريباً؟ شاركنا توقعك في التعليقات!", "part1": "هل نستطيع بناء الأضخم؟", "part2": "اكتب رأيك الآن!", "coords": "GLOBAL RADAR", "location_tag": "مشاريع المستقبل", "query": "futuristic modern skyscraper construction"}
             ]
         }
     ],
@@ -170,14 +173,13 @@ FALLBACK_TOPICS_POOL = {
         {
             "title_a": "[كارثة عالمية] لو الممر ده اتقفل 24 ساعة، كوكب الأرض هيقف تماماً !! 🚢🚨",
             "title_b": "[خمس نفط الكوكب] ممر مائي استراتيجي يهدد بتعطيل تريليونات الدولارات فوراً !! 🛢️💸",
-            "desc": "أسرار خطوط الملاحة وسلاسل التوريد العالمية وأمن تجارة الطاقة والنفط بين الشرق والغرب!\n\n🔴 تابع سلسلة اقتصاد الملاحة كاملة في قناتنا: https://youtube.com/@MasarFlow\n#مسار #تجارة_دولية #سلاسل_الإمداد #اقتصاد_النفط #قناة_السويس #Shorts",
-            "pinned_comment": "💬 لو تعطلت الملاحة أسبوعاً كاملاً.. ما هي أول سلعة ستختفي من حياتك برأيك؟ شاركنا بالتعليقات!",
+            "desc": "أسرار الملاحة البحرية ومضيق هرمز وشرايين تجارة النفط العالمية.\n\n🔴 اشترك وفعل الجرس لمتابعة كواليس مسارات التجارة الدولية!\n#مسار #تجارة_دولية #سلاسل_الإمداد #قناة_السويس #Shorts",
+            "pinned_comment": "💬 لو تعطلت الملاحة أسبوعاً كاملاً.. ما هي أول سلعة ستختفي من حياتك برأيك؟ اكتب تعليقك!",
             "scenes": [
-                {"hook": "عارف إن لو مضيق هرمز اتقفل يوم، خُمس نفط كوكب الأرض هيتوقف والأسعار هتولع؟", "part1": "لو اتقفل يوم واحد", "part2": "خمس نفط العالم يقف!", "coords": "26°34'N 56°15'E", "location_tag": "مضيق هرمز - الخليج", "query": "huge cargo ship ocean storm", "has_callout": True, "has_map_highlight": True},
-                {"hook": "سفينة الحاويات الحديثة بتشيل أربعة وعشرين ألف حاوية، بحجم ناطحة سحاب عائمة بالبحر!", "part1": "24 ألف حاوية", "part2": "ناطحة سحاب عائمة!", "coords": "30°42'N 32°20'E", "location_tag": "بورسعيد - مصر", "query": "container terminal port aerial", "has_scale": True},
-                {"hook": "وجنوح إيفر جيفن في قناة السويس، وقف تجارة عالمية بعشرة مليارات دولار باليوم!", "part1": "كارثة السويس", "part2": "10 مليارات $ باليوم!", "coords": "30°01'N 32°34'E", "location_tag": "قناة السويس - مصر", "query": "canal ship navigation traffic", "has_map_highlight": True},
-                {"hook": "وتسعين بالمئة من كل أجهزة وملابس العالم، بتسافر بالمحيطات قبل ما توصل لإيدك!", "part1": "90% من أجهزتك", "part2": "سافرت عبر المحيطات!", "coords": "01°16'N 103°50'E", "location_tag": "مضيق ملقا - آسيا", "query": "freight vessel open sea waves"},
-                {"hook": "تفتكر إيه هو أخطر شريان بحري في العالم؟ اكتب رأيك لأن الكارثة هتبدأ لو اتعطل...", "part1": "ما هو الممر الأخطر؟", "part2": "اكتب رأيك الآن!", "coords": "GLOBAL RADAR", "location_tag": "طرق التجارة الدولية", "query": "ocean blue waves aerial drone"}
+                {"hook": "عارف إن لو مضيق هرمز اتقفل يوم، خُمس نفط كوكب الأرض هيتوقف والأسعار هتولع؟", "part1": "لو اتقفل يوم واحد", "part2": "خمس نفط العالم يقف!", "coords": "26°34'N 56°15'E", "location_tag": "مضيق هرمز", "query": "strait of hormuz oil tanker drone aerial", "has_callout": True, "has_map_highlight": True},
+                {"hook": "سفينة الحاويات الحديثة بتشيل أربعة وعشرين ألف حاوية، بحجم ناطحة سحاب عائمة بالبحر!", "part1": "24 ألف حاوية", "part2": "ناطحة سحاب عائمة!", "coords": "30°42'N 32°20'E", "location_tag": "بورسعيد", "query": "container vessel loading port time lapse", "has_scale": True},
+                {"hook": "وجنوح إيفر جيفن في قناة السويس، وقف تجارة عالمية بعشرة مليارات دولار في اليوم الواحد!", "part1": "كارثة السويس", "part2": "10 مليارات $ باليوم!", "coords": "30°01'N 32°34'E", "location_tag": "قناة السويس", "query": "suez canal cargo ship navigation", "has_map_highlight": True},
+                {"hook": "تفتكر إيه هو أخطر شريان بحري في العالم ممكن يهدد حركة الكوكب؟ اكتب رأيك بالتعليقات!", "part1": "ما الممر الأخطر؟", "part2": "اكتب رأيك الآن!", "coords": "GLOBAL RADAR", "location_tag": "طرق الملاحة", "query": "open ocean cargo ship sunset"}
             ]
         }
     ]
@@ -186,35 +188,36 @@ FALLBACK_TOPICS_POOL = {
 def generate_ai_script(niche_name):
     if not GEMINI_API_KEY:
         return None
+
     history = load_history().get(niche_name, [])
-    titles_history = [item.get("title", "") if isinstance(item, dict) else str(item) for item in history[-8:]]
+    titles_history = [item.get("title", "") if isinstance(item, dict) else str(item) for item in history[-6:]]
     history_context = ", ".join(titles_history) if titles_history else "لا يوجد"
 
     candidate_models = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-pro"]
     prompt = f"""
-أنت مخرج Shorts استقصائي عبقري يجمع بين أسلوب غابرييل عماد و Vox.
-المجال: {niche_name}.
-المواضيع السابقة الممنوعة: [{history_context}].
+أنت مخرج Shorts وثائقي استقصائي محترف (أسلوب غابرييل عماد و Vox).
+المجال المخصص حصرياً لهذه القناة: {niche_name}.
+المواضيع السابقة الممنوع تكرارها: [{history_context}].
 البذرة العشوائية: {random.randint(1000, 999999)}.
 
 الشروط الصارمة:
-1. ولّد 5 مشاهد سريعة وخاطفة جداً (مدة كل مشهد صوتياً لا تتجاوز 7 ثوانٍ، لإجمالي فيديو تحت 50 ثانية).
-2. السرد بالعامية المصرية السريعة والمشوقة.
-3. عنوانان للتجربة A/B (title_a فضول، title_b صدمة أرقام واقتصادية).
-4. الإخراج بتنسيق JSON حصراً بدون أي كود Markdown:
+1. ولّد 4 مشاهد فقط (نصوص سريعة وخاطفة لا تتجاوز 40 ثانية إجمالاً).
+2. السرد بالعامية المصرية المشوقة.
+3. المشهد الرابع يجب أن ينتهي بسؤال حارق للتفاعل بالتعليقات.
+4. إخراج بصيغة JSON حصراً وبدون علامات Markdown:
 {{
   "title_a": "[لغز غامض] عنوان الفضول",
-  "title_b": "[أرقام صادمة] عنوان القيمة الاقتصادية",
-  "desc": "وصف SEO غني بمصطلحات High-CPM وروابط القناة والهاشتاجات",
-  "pinned_comment": "سؤال جدلي حارق للتفاعل",
+  "title_b": "[أرقام صادمة] عنوان الصدمة والقيمة",
+  "desc": "وصف جذاب للقناة مع هاشتاجات وروابط",
+  "pinned_comment": "سؤال حارق ومثير للجدل للتعليقات",
   "scenes": [
     {{
-      "hook": "الجملة المنطوقة المختصرة بالعامية المصرية",
-      "part1": "كلمتين تمهيد",
-      "part2": "كلمتين وصدمة أو رقم",
+      "hook": "الجملة السردية السريعة بالعامية المصرية",
+      "part1": "كلمتان للتمهيد",
+      "part2": "كلمتان وصدمة أو رقم",
       "coords": "27°12'N 31°15'E",
-      "location_tag": "اسم الدولة أو الموقع",
-      "query": "cinematic stock video query english",
+      "location_tag": "اسم الموقع باللغة العربية",
+      "query": "cinematic stock footage query english",
       "has_callout": false,
       "has_scale": false,
       "has_map_highlight": false
@@ -230,7 +233,7 @@ def generate_ai_script(niche_name):
                 txt = res.json()["candidates"][0]["content"]["parts"][0]["text"]
                 txt = txt.strip().replace("```json", "").replace("```", "").strip()
                 data = json.loads(txt)
-                if "scenes" in data and len(data["scenes"]) >= 4:
+                if "scenes" in data and len(data["scenes"]) >= 3:
                     return data
         except Exception:
             continue
@@ -238,7 +241,7 @@ def generate_ai_script(niche_name):
 
 def get_channel_content(niche_name):
     ai_content = generate_ai_script(niche_name)
-    content = ai_content if ai_content else random.choice(FALLBACK_TOPICS_POOL.get(niche_name, [])).copy()
+    content = ai_content if ai_content else random.choice(DIVERSE_TOPICS_POOL.get(niche_name, [])).copy()
 
     if random.choice([True, False]) and "title_b" in content:
         chosen_title = content["title_b"]
@@ -253,7 +256,7 @@ def get_channel_content(niche_name):
     return content
 
 # ==============================================================================
-# 5. محرك الغرافيكس والخرائط التفاعلية والـ AI Fallback
+# 4. محرك الجرافيكس وشارة الاشتراك (Subscribe CTA Pill)
 # ==============================================================================
 def get_best_arabic_font(size=60):
     for p in [
@@ -262,14 +265,55 @@ def get_best_arabic_font(size=60):
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     ]:
         if os.path.exists(p):
-            try:
-                return ImageFont.truetype(p, size)
-            except Exception:
-                pass
+            try: return ImageFont.truetype(p, size)
+            except Exception: pass
     return ImageFont.load_default()
 
 def clean_arabic_text(text):
     return re.sub(r'[^\w\s\d\u0600-\u06FF!؟,\.\:\-\(\)\"\$]+', '', text).strip()
+
+def create_header_badge(badge_text, path="header_badge.png", size=(1080, 1920)):
+    img = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    font = get_best_arabic_font(size=36)
+    has_raqm = features.check("raqm")
+    display_badge = clean_arabic_text(badge_text)
+    if not has_raqm:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        display_badge = get_display(arabic_reshaper.reshape(display_badge))
+
+    bbox = draw.textbbox((0, 0), display_badge, font=font)
+    text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    y_center = 175
+    draw.rounded_rectangle([540 - (text_w // 2) - 35, y_center - 14, 540 + (text_w // 2) + 35, y_center + text_h + 14], radius=28, fill=(10, 15, 25, 215), outline=(255, 215, 0, 180), width=2)
+    draw.text((540, y_center), display_badge, font=font, fill=(255, 255, 255, 255), anchor="mt", direction="rtl" if has_raqm else None)
+    img.save(path)
+    return path
+
+# شارة "اشترك في القناة وفعل الجرس" الاحترافية
+def create_subscribe_cta_overlay(cta_text, handle_text, path="sub_cta.png", size=(1080, 1920)):
+    img = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    font_btn = get_best_arabic_font(size=38)
+    font_sub = get_best_arabic_font(size=26)
+    has_raqm = features.check("raqm")
+
+    txt_display = clean_arabic_text(cta_text)
+    if not has_raqm:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        txt_display = get_display(arabic_reshaper.reshape(txt_display))
+
+    # كبسولة حمراء عريضة وواضحة جداً في الثلث السفلي
+    bx1, by1, bx2, by2 = 140, 1380, 940, 1520
+    draw.rounded_rectangle([bx1, by1, bx2, by2], radius=32, fill=(220, 20, 40, 235), outline=(255, 255, 255, 240), width=4)
+
+    # نص زر الاشتراك والأيقونة
+    draw.text((540, by1 + 18), txt_display, font=font_btn, fill=(255, 255, 255, 255), anchor="mt", direction="rtl" if has_raqm else None)
+    draw.text((540, by1 + 78), f"{handle_text} | انضم إلينا الآن", font=font_sub, fill=(255, 235, 59, 240), anchor="mt")
+    img.save(path)
+    return path
 
 def generate_country_vector_glow(location_name, coords_text, path="vector_map.png", size=(1080, 1920)):
     img = Image.new("RGBA", size, (0, 0, 0, 0))
@@ -296,7 +340,6 @@ def generate_country_vector_glow(location_name, coords_text, path="vector_map.pn
     loc_display = clean_arabic_text(location_name)
     draw.text((540, by1 + 22), f"TERRITORY SCAN: {loc_display}", font=font_bold, fill=(0, 240, 255, 255), anchor="mt", direction="rtl" if has_raqm else None)
     draw.text((540, by2 - 40), f"COORDINATES: {coords_text} | SATELLITE LOCK", font=font_small, fill=(200, 230, 255, 220), anchor="mt")
-
     img.save(path)
     return path
 
@@ -412,26 +455,6 @@ def generate_alert_banner(text="تحذير: حقائق سرية وصادمة", p
     img.save(path)
     return path
 
-# الدالة بعد التصحيح وتمرير المعامل path
-def create_header_badge(badge_text, path="header_badge.png", size=(1080, 1920)):
-    img = Image.new("RGBA", size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    font = get_best_arabic_font(size=36)
-    has_raqm = features.check("raqm")
-    display_badge = clean_arabic_text(badge_text)
-    if not has_raqm:
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-        display_badge = get_display(arabic_reshaper.reshape(display_badge))
-
-    bbox = draw.textbbox((0, 0), display_badge, font=font)
-    text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    y_center = 175
-    draw.rounded_rectangle([540 - (text_w // 2) - 35, y_center - 14, 540 + (text_w // 2) + 35, y_center + text_h + 14], radius=28, fill=(10, 15, 25, 215), outline=(255, 215, 0, 180), width=2)
-    draw.text((540, y_center), display_badge, font=font, fill=(255, 255, 255, 255), anchor="mt", direction="rtl" if has_raqm else None)
-    img.save(path)
-    return path
-
 def create_micro_caption_with_counter(text_phrase, ch_idx, scene_idx, step_idx, is_highlight=False, counter_val=None, size=(1080, 1920)):
     img = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -453,7 +476,7 @@ def create_micro_caption_with_counter(text_phrase, ch_idx, scene_idx, step_idx, 
     return path
 
 # ==============================================================================
-# 6. الصوت والـ Audio Ducking والـ SSML
+# 5. الصوت والـ SSML والـ Ducking
 # ==============================================================================
 async def generate_voice_ssml(text, output_file, voice_id, rate_val):
     import edge_tts
@@ -461,9 +484,9 @@ async def generate_voice_ssml(text, output_file, voice_id, rate_val):
     <speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='ar-EG'>
         <voice name='{voice_id}'>
             <prosody rate='{rate_val}'>
-                <break time='140ms'/>
+                <break time='130ms'/>
                 {text}
-                <break time='100ms'/>
+                <break time='90ms'/>
             </prosody>
         </voice>
     </speak>
@@ -482,7 +505,7 @@ def apply_audio_ducking(bgm_clip, speech_intervals, total_dur):
     return bgm_clip.fl(volume_filter)
 
 # ==============================================================================
-# 7. معالجة الفيديو والحركة (Fast Cuts & Landscape to Portrait)
+# 6. معالجة الفيديو والحركة (Fast Cuts)
 # ==============================================================================
 def fetch_pexels_video_pair(query, file_a, file_b):
     clips_saved = 0
@@ -533,15 +556,15 @@ def create_subclip_processed(file_path, duration, target_size=(1080, 1920), is_h
     return clip
 
 # ==============================================================================
-# 8. محرك الإنتاج مع حارس المدة الصارم (Strict Duration Guard)
+# 7. بناء الفيديو الشورتس ودمج الـ CTA الصوتي والبصري
 # ==============================================================================
 def build_viral_short(channel_name, content_data, ch_idx):
     ensure_audio_assets()
     size = (1080, 1920)
-    profile = NICHE_PROFILES.get(channel_name, {"voice": "ar-EG-ShakirNeural", "rate": "+20%", "badge": "أبعاد جغرافية", "handle": "@AbaadGeo"})
+    profile = NICHE_PROFILES.get(channel_name, NICHE_PROFILES["أبعاد جغرافية"])
     
-    # حارس صارم: الاكتفاء بأول 4 أو 5 مشاهد لضمان عدم تجاوز 55 ثانية نهائياً
-    scenes_data = content_data["scenes"][:5]
+    # حارس صارم: 4 مشاهد سريعة تضمن مدة إجمالية بين 42 إلى 48 ثانية
+    scenes_data = content_data["scenes"][:4]
 
     scenes = []
     temp_files = []
@@ -558,8 +581,7 @@ def build_viral_short(channel_name, content_data, ch_idx):
     voice_audio_clips = []
 
     for s_idx, item in enumerate(scenes_data):
-        # التوقف الفوري إذا اقترب الإجمالي من 50 ثانية
-        if current_time >= 50.0:
+        if current_time >= 44.0:
             break
 
         print(f"🎬 معالجة المشهد ({s_idx + 1}/{len(scenes_data)}): {item.get('query')}")
@@ -568,8 +590,7 @@ def build_viral_short(channel_name, content_data, ch_idx):
         asyncio.run(generate_voice_ssml(item["hook"], aud_path, profile["voice"], profile["rate"]))
         aud_clip = AudioFileClip(aud_path)
         
-        # المشهد الفردي لا يزيد عن 9 ثوانٍ
-        actual_dur = min(aud_clip.duration + 0.1, 9.0)
+        actual_dur = min(aud_clip.duration + 0.1, 8.5)
         temp_files.append(aud_path)
 
         scene_start_times.append(current_time)
@@ -678,11 +699,26 @@ def build_viral_short(channel_name, content_data, ch_idx):
         scenes.append(scene)
         current_time += actual_dur
 
+    # إضافة مقطع صوتي ختامي لدعوة المشاهد للاشتراك (Voice CTA)
+    cta_aud_path = f"cta_aud_{ch_idx}.mp3"
+    asyncio.run(generate_voice_ssml(profile["voice_cta"], cta_aud_path, profile["voice"], profile["rate"]))
+    cta_clip = AudioFileClip(cta_aud_path)
+    cta_dur = cta_clip.duration + 0.3
+    temp_files.append(cta_aud_path)
+
+    speech_intervals.append((current_time, current_time + cta_dur))
+    voice_audio_clips.append(cta_clip.set_start(current_time))
+
+    # مد المشهد الأخير أو إضافة خلفية ختامية للـ CTA
+    last_bg = ColorClip(size=size, color=(10, 18, 32)).set_duration(cta_dur)
+    scenes.append(last_bg)
+    current_time += cta_dur
+
     final_video = concatenate_videoclips(scenes, method="compose")
     
-    # حماية قصوى: ألا تزيد مدة الفيديو عن 55 ثانية
-    if final_video.duration > 55.0:
-        final_video = final_video.subclip(0, 55.0)
+    # ضمان نهائي للمدة: بين 45 و 50 ثانية كحد أقصى
+    if final_video.duration > 50.0:
+        final_video = final_video.subclip(0, 50.0)
     total_duration = final_video.duration
 
     overlay_clips = [final_video]
@@ -701,7 +737,6 @@ def build_viral_short(channel_name, content_data, ch_idx):
                     .set_position((0, 1920 - 20)))
     overlay_clips.append(progress_bar)
 
-    # استخدام اسم ملف مخصص للشارة لتفادي الخطأ السابق
     badge_path = create_header_badge(profile["badge"], path=f"badge_{ch_idx}.png", size=size)
     temp_files.append(badge_path)
     overlay_clips.append(ImageClip(badge_path).set_duration(total_duration))
@@ -714,6 +749,12 @@ def build_viral_short(channel_name, content_data, ch_idx):
     temp_files.append(alert_path)
     overlay_clips.append(ImageClip(alert_path).set_duration(1.2))
 
+    # إضافة شارة زر الاشتراك (Subscribe & Bell) في آخر 4 ثوانٍ من الفيديو
+    sub_cta_path = create_subscribe_cta_overlay(profile["cta_text"], profile["handle"], path=f"sub_cta_{ch_idx}.png", size=size)
+    temp_files.append(sub_cta_path)
+    sub_start = max(0.0, total_duration - 4.5)
+    overlay_clips.append(ImageClip(sub_cta_path).set_duration(total_duration - sub_start).set_start(sub_start))
+
     overlay_clips.append(ColorClip(size=size, color=(255, 255, 255)).set_duration(0.10).set_opacity(0.85))
 
     final_video = CompositeVideoClip(overlay_clips, size=size)
@@ -722,6 +763,11 @@ def build_viral_short(channel_name, content_data, ch_idx):
 
     if os.path.exists("sfx_impact.mp3"):
         try: audio_layers.append(AudioFileClip("sfx_impact.mp3").volumex(0.75).set_start(0.0))
+        except Exception: pass
+
+    # رنة جرس التنبيه لحظة ظهور شارة الاشتراك
+    if os.path.exists("sfx_bell.mp3"):
+        try: audio_layers.append(AudioFileClip("sfx_bell.mp3").volumex(0.60).set_start(sub_start))
         except Exception: pass
 
     if os.path.exists("sfx_whoosh.mp3"):
@@ -802,7 +848,7 @@ def build_viral_short(channel_name, content_data, ch_idx):
     return out_name
 
 # ==============================================================================
-# 9. الرفع والنشر عبر Buffer
+# 8. محرك الرفع والنشر المباشر عبر Buffer
 # ==============================================================================
 def upload_video_file(file_path):
     print(f"☁️ جاري رفع {file_path}...")
@@ -866,7 +912,7 @@ def publish_to_buffer_now(channel_id, title, desc, video_url):
         print(f"⚠️ استجابة Buffer للقناة [{channel_id}]: {data}")
 
 # ==============================================================================
-# 10. نقطة التشغيل الرئيسية
+# 9. نقطة التشغيل الرئيسية
 # ==============================================================================
 def main():
     print(f"📋 إجمالي عدد القنوات المستهدفة: {len(CHANNELS_LIST)}")
@@ -875,21 +921,21 @@ def main():
         niche_name = NICHE_NAMES[idx % len(NICHE_NAMES)]
         
         print(f"\n=======================================================")
-        print(f"🚀 [القناة {idx+1}/{len(CHANNELS_LIST)}] إنتاج شورتس بمحرك High-CPM & Geo-Vector: {niche_name}")
+        print(f"🚀 [القناة {idx+1}/{len(CHANNELS_LIST)}] إنتاج شورتس بمحتوى فريد وهوية مخصصة: {niche_name}")
         print(f"=======================================================")
 
         content_data = get_channel_content(niche_name)
         active_title = content_data.get("active_title", "وثائقي استقصائي")
         strategy = content_data.get("strategy_used", "A_CURIOSITY")
 
-        print(f"🧪 [استراتيجية العنوان المختبرة A/B]: {strategy}")
-        print(f"📌 [العنوان النهائي]: {active_title}")
-        print(f"💬 [التعليق المثبت الجاهز للنسخ]: {content_data.get('pinned_comment')}\n")
+        print(f"🧪 [الاستراتيجية]: {strategy}")
+        print(f"📌 [العنوان الفريد]: {active_title}")
+        print(f"💬 [التعليق المثبت]: {content_data.get('pinned_comment')}\n")
 
         video_path = build_viral_short(niche_name, content_data, idx)
         video_url = upload_video_file(video_path)
 
-        print(f"⚡ نشر مباشر ولحظي إلى يوتيوب الآن...")
+        print(f"⚡ نشر مباشر ولحظي للقناة عبر Buffer...")
         publish_to_buffer_now(channel_id, active_title, content_data["desc"], video_url)
 
         if os.path.exists(video_path):
