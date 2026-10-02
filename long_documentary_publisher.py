@@ -11,6 +11,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 
+# تثبيت المكتبات الداعمة تلقائياً إن لم تكن متوفرة
 try:
     import edge_tts
 except ImportError:
@@ -25,33 +26,43 @@ except ImportError:
 
 import google.generativeai as genai
 
-# --- 1. مفاتيح التشغيل والذكاء الاصطناعي ---
+# --- 1. الإعدادات واختيار نموذج الذكاء الاصطناعي النشط ---
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 PEXELS_KEY = os.getenv("PEXELS_API_KEY")
 
 genai.configure(api_key=GEMINI_KEY)
 
 def get_active_model():
-    """اختيار نموذج نشط تلقائياً لحسابك"""
-    candidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
+    """اختيار نموذج متاح وفعال لحسابك تلقائياً"""
+    candidates = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro",
+        "gemini-pro"
+    ]
     try:
-        available = [m.name.replace("models/", "") for m in genai.list_models() if "generateContent" in m.supported_generation_methods]
+        available = [
+            m.name.replace("models/", "")
+            for m in genai.list_models()
+            if "generateContent" in m.supported_generation_methods
+        ]
         for c in candidates:
             if c in available:
-                print(f"🎯 تم تفعيل النموذج: [{c}]")
+                print(f"🎯 تم تفعيل النموذج المعتمد: [{c}]")
                 return genai.GenerativeModel(c)
         if available:
             return genai.GenerativeModel(available[0])
     except Exception as e:
-        print(f"⚠️ تنبيه فحص النماذج: {e}")
+        print(f"⚠️ جاري استخدام النموذج الافتراضي: {e}")
     return genai.GenerativeModel("gemini-2.0-flash")
 
 model = get_active_model()
 VOICE_NAME = "ar-EG-ShakirNeural"  # صوت بشري وثائقي طبيعي
-MIN_REQUIRED_SECONDS = 1200        # 20 دقيقة كحد أدنى (1200 ثانية)
+MIN_REQUIRED_SECONDS = 1200        # الحد الأدنى الصارم: 20 دقيقة (1200 ثانية)
 
 def clean_arabic_text(text: str) -> str:
-    """تنظيف النص من الماركداون والرموز غير المنطوقة"""
+    """تنظيف النص من الرموز والماركداون لضمان نطق سليم"""
     text = re.sub(r'[*#_`~>\[\]\(\)]', ' ', text)
     text = text.replace('"', ' ').replace("'", ' ')
     text = re.sub(r'\s+', ' ', text).strip()
@@ -66,29 +77,30 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
-# --- 2. توليد فكرة عشوائية غير مقيدة ---
+# --- 2. توليد فكرة عشوائية غير محصورة ---
 def get_random_topic(channel_name: str) -> dict:
-    print(f"🎲 جاري ابتكار فكرة وثائقية عشوائية لقناة [{channel_name}]...")
+    print(f"🎲 جاري ابتكار فكرة وثائقية عشوائية جديدة لقناة [{channel_name}]...")
     prompt = f"""
     أنت مدير إنتاج لقناة وثائقيات اسمها "{channel_name}".
-    ابتكر فكرة وثائقية جديدة ومثيرة للمشاهدين وغير مكررة.
+    ابتكر فكرة وثائقية جديدة تماماً وعشوائية ومثيرة للمشاهدين دون التقيد بتصنيف مسبق.
+    نوّع بحرية بين: حضارات مفقودة، ألغاز جغرافية، صراعات استخباراتية، مدن تحت الأرض، كوارث غيرت العالم، تقنيات مجهولة، أو رحلات استكشافية كبرى.
+    
     أخرج الرد بصيغة JSON فقط:
     {{
         "title": "عنوان وثائقي عربي تشويقي وموجز",
-        "topic": "وصف شيق للقصة الوثائقية ومحاورها",
-        "search_keywords": ["aerial documentary landscape", "cinematic nature 4k", "historical mystery", "ancient ruins"]
+        "topic": "وصف شيق ومفصل للقصة الوثائقية ومحاورها",
+        "search_keywords": ["4", "كلمات", "بحث", "إنجليزية", "مناسبة", "لفيديوهات", "pexels"]
     }}
     """
     try:
         res = model.generate_content(prompt)
         cleaned = res.text.strip().replace("```json", "").replace("```", "")
         data = json.loads(cleaned)
-    except Exception as e:
-        print(f"⚠️ خطأ قراءة الفكرة من Gemini ({e})، سيتم استخدام فكرة وثائقية بديلة...")
+    except Exception:
         topics = [
             ("أسرار الممالك المفقودة: مدن طمستها الرمال", "رحلة استكشافية تكشف أسرار أقدم الحضارات التي اختفت فجأة دون تفسير علمي حاسم.", ["ancient ruins 4k", "desert mystery", "archaeology", "epic landscape"]),
-            ("خفايا الحدود المغلقة: ألغاز جغرافية غير مفسرة", "حقائق صادمة حول أكثر المناطق المعزولة والحدود الجغرافية غرابة على وجه الأرض.", ["mountain border", "extreme landscape", "military bunker", "remote island aerial"]),
-            ("أعظم ألغاز الأعماق: ما لا نعلمه عن كوكبنا", "استكشاف أعمق المناطق وأكثرها عزلة وخطورة على وجه البسيطة وأثرها على التوازن الطبيعي.", ["extreme wilderness", "mysterious mountains", "unexplored nature", "aerial drone 4k"])
+            ("خفايا العمليات السرية: ملفات غيرت مسار التاريخ", "كواليس وحقائق غير معلنة حول أحداث حاسمة صاغت موازين القوى العالمية خلف الأبواب المغلقة.", ["classified documents", "historical warfare", "vintage intelligence", "cinematic shadows"]),
+            ("حدود الكوكب المجهولة: بقاع لم يطأها إنسان", "استكشاف أعمق المناطق وأكثرها عزلة وخطورة على وجه البسيطة وأثرها على التوازن الطبيعي.", ["extreme wilderness", "mysterious mountains", "unexplored nature", "aerial drone 4k"])
         ]
         chosen = random.choice(topics)
         data = {"title": chosen[0], "topic": chosen[1], "search_keywords": chosen[2]}
@@ -96,34 +108,32 @@ def get_random_topic(channel_name: str) -> dict:
     print(f"  💡 العنوان المختار: {data['title']}")
     return data
 
-# --- 3. توليد سيناريو ضخم (+3000 كلمة) بطلبين فقط لتجنب الـ Rate Limit ---
+# --- 3. توليد سيناريو ضخم (+3000 كلمة) بطلبين لتجنب قيود الـ API ---
 def generate_long_script(title: str, topic: str) -> str:
-    print(f"✍️ جاري كتابة السرد الوثائقي الموسع بنظام القسمين لضمان تجاوز 20 دقيقة...")
+    print(f"✍️ جاري كتابة السرد الوثائقي المطول لضمان تخطي 20 دقيقة...")
     
     script_parts = []
     
-    # الجزء الأول: المقدمة والفصول الأولى (1500+ كلمة)
     prompt_part1 = f"""
     أنت كبير كتّاب الأفلام الوثائقية التلفزيونية.
     موضوع العمل: "{title}".
     الوصف: "{topic}".
     
-    المطلوب: اكتب النصف الأول من السيناريو الوثائقي (المقدمة، والبدايات التاريخية، والأسرار الأولى غير المتداولة، ونقاط التحول الكبرى).
+    المطلوب: اكتب النصف الأول من السيناريو الوثائقي (المقدمة، الجذور التاريخية والبدايات، والحقائق غير المعلنة ونقاط التحول).
     شروط ملزمة:
-    1. اكتب نصاً سردياً مطولاً ومفصلاً جداً لا يقل عن 1500 كلمة باللغة العربية الفصحى الفخمة.
-    2. اكتب فقط ما ينطقه الراوي بصوته دون أي توجيهات إخراجية أو كلمات مثل (مشهد، راوي، موسيقى).
+    1. اكتب نصاً سردياً مطولاً جداً لا يقل عن 1500 كلمة باللغة العربية الفصحى الفخمة.
+    2. اكتب فقط ما ينطقه الراوي بصوته دون أي توجيهات إخراجية أو أسماء للمشاهد.
     """
     
-    # الجزء الثاني: الأبعاد الاستراتيجية، الأسرار العميقة، والخاتمة (1500+ كلمة)
     prompt_part2 = f"""
     أنت كبير كتّاب الأفلام الوثائقية التلفزيونية.
     موضوع العمل: "{title}".
     الوصف: "{topic}".
     
-    المطلوب: اكتب النصف الثاني والمتمم للسيناريو الوثائقي (التحديات الكبرى، الأبعاد الجيوسياسية والاقتصادية، النظريات المحيرة، واستشراف المستقبل والخاتمة المؤثرة).
+    المطلوب: اكتب النصف الثاني والمتمم للسيناريو (التحديات الكبرى، الأبعاد الاستراتيجية، الأسرار العميقة، والخاتمة الفلسفية).
     شروط ملزمة:
-    1. اكتب نصاً سردياً مطولاً ومفصلاً جداً لا يقل عن 1500 كلمة باللغة العربية الفصحى الفخمة.
-    2. اكتب فقط ما ينطقه الراوي بصوته مباشرة دون أي توجيهات إخراجية.
+    1. اكتب نصاً سردياً مطولاً جداً لا يقل عن 1500 كلمة باللغة العربية الفصحى الفخمة.
+    2. اكتب فقط ما ينطقه الراوي بصوته مباشرة.
     """
     
     for idx, p in enumerate([prompt_part1, prompt_part2], 1):
@@ -134,39 +144,38 @@ def generate_long_script(title: str, topic: str) -> str:
                 res = model.generate_content(p)
                 if res.text:
                     cleaned_text = clean_arabic_text(res.text.strip())
-                    if len(cleaned_text.split()) > 300:
+                    if len(cleaned_text.split()) > 250:
                         script_parts.append(cleaned_text)
                         print(f"  ✅ تم إنجاز القسم {idx} بنجاح ({len(cleaned_text.split())} كلمة)!")
                         success = True
                         time.sleep(4)
                         break
             except Exception as err:
-                print(f"  ⚠️️ خطأ في محاولة توليد القسم {idx}: {err}")
+                print(f"  ⚠️ خطأ محاولة توليد القسم {idx}: {err}")
                 time.sleep(5)
                 
         if not success:
-            print(f"  ⚠️ تم استخدام سرد ملحمي احتياطي موسع للقسم {idx}.")
-            fallback_narrative = (
-                f"في عمق التاريخ وحنايا الوجود الإنساني، تقف أحداث {title} شاهداً على قدرة الإرادة البشرية وصراعها الدائم مع المجهول. "
-                "لقد بدأت القصة في زمن لم تكن فيه الأدوات الحديثة متاحة، حين كانت الرؤية وحدها هي البوصلة التي تقود المستكشفين والعلماء نحو المجهول. "
-                "ومع تعاقب السنوات وتراكم الأدلة والوثائق السرية التي ظلت طي الكتمان لعقود طويلة، تكشفت حقائق صادمة أعادت رسم ملامح الصورة بالكامل. "
-                "لم تكن التحديات تقنية أو طبيعية فحسب، بل ارتبطت بصراعات جيوسياسية وتنافس استراتيجي صاغ موازين القوى في المنطقة والعالم. "
-                "إن تفحص الوثائق وتحليل الأرقام الميدانية يبرز بوضوح كيف أثرت هذه التجربة الاستثنائية على مصائر الملايين، تاركة بصمة لا تمحى في الذاكرة الإنسانية. "
+            print(f"  ⚠️ استخدام السرد الاحتياطي للقسم {idx} لضمان اكتمال المدة.")
+            fallback = (
+                f"في عمق التاريخ وحنايا الوجود الإنساني، تقف شواهد {title} كدليل راسخ على قدرة العقل البشري على مجابهة المجهول وتجاوز الحدود التقليدية. "
+                "لقد انطلقت هذه الرحلة من فكرة بسيطة سرعان ما تحولت إلى واقع فرض نفسه على مجريات الأحداث، حيث تلاقت الإرادة مع التحديات الطبيعية والتقنية المعقدة. "
+                "تظهر السجلات والوثائق المحفوظة أن ما خفي من تفاصيل كان يفوق بكثير ما تم إعلانه في ذلك الحين، لتكشف لنا الدراسات المتأخرة أسراراً حاسمة. "
+                "إن تفحص الأرقام الدقيقة والمسارات التي سلكها الرواد يبرز بوضوح كيف تشكلت موازين جديدة أثرت على المنطقة والعالم بأسره دون رجعة. "
             ) * 12
-            script_parts.append(clean_arabic_text(fallback_narrative))
+            script_parts.append(clean_arabic_text(fallback))
 
     full_script = "\n\n".join(script_parts)
-    print(f"📊 إجمالي حجم السيناريو النهائي: {len(full_script.split())} كلمة.")
+    print(f"📊 إجمالي حجم السيناريو: {len(full_script.split())} كلمة.")
     return full_script
 
-# --- 4. توليد الصوت البشري الآمن وضمان الـ 20 دقيقة ---
+# --- 4. توليد الصوت البشري المجزأ وحمايته من التوقف ---
 async def generate_chunk_edge_tts(chunk_text: str, output_file: str):
     comm = edge_tts.Communicate(chunk_text, VOICE_NAME, rate="-4%")
     await comm.save(output_file)
 
 def build_guaranteed_audio(title: str, topic: str) -> float:
     script_text = generate_long_script(title, topic)
-    print(f"🎙️ جاري توليد التعليق الصوتي البشري الممتد...")
+    print(f"🎙️ جاري توليد التعليق الصوتي البشري...")
     
     words = script_text.split()
     chunk_size = 140
@@ -199,7 +208,7 @@ def build_guaranteed_audio(title: str, topic: str) -> float:
                 pass
                 
         if idx % 5 == 0 or idx == len(chunks):
-            print(f"  🔊 اكتمل تسجيل {idx}/{len(chunks)} جزءاً من التعليق الصوتي...")
+            print(f"  🔊 اكتمل تسجيل {idx}/{len(chunks)} جزءاً من الصوت...")
 
     if part_files:
         with open("audio_list.txt", "w", encoding="utf-8") as f:
@@ -207,13 +216,33 @@ def build_guaranteed_audio(title: str, topic: str) -> float:
                 f.write(f"file '{os.path.abspath(p)}'\n")
         subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "audio_list.txt", "-c", "copy", "narration.mp3"], check=True)
     else:
-        gtts.gTTS(text="وثائقي شامل يستعرض أهم الحقائق والتحليلات المعمقة.", lang="ar").save("narration.mp3")
+        gtts.gTTS(text="وثائقي استكشافي شامل يستعرض أهم الحقائق والتحليلات.", lang="ar").save("narration.mp3")
 
     duration = get_audio_duration("narration.mp3")
-    print(f"🎧 مدة التعليق الصوتي المسجل: {duration / 60:.2f} دقيقة ({duration:.0f} ثانية)")
+    print(f"🎧 مدة الصوت الحالية: {duration / 60:.2f} دقيقة ({duration:.0f} ثانية)")
+
+    # ضمان تخطي 20 دقيقة
+    while duration < MIN_REQUIRED_SECONDS:
+        print(f"⚠️ الصوت الحالي {duration / 60:.1f} دقيقة؛ جاري إضافة ملحق وثائقي لتجاوز 20 دقيقة...")
+        extra_prompt = f"اكتب فصلاً وثائقياً تكميلياً موسعاً (800 كلمة) باللغة العربية الفصحى يحلل بعمق زوايا جديدة حول: {title}."
+        extra_text = clean_arabic_text(model.generate_content(extra_prompt).text.strip())
+        
+        try:
+            asyncio.run(generate_chunk_edge_tts(extra_text, "extra.mp3"))
+        except Exception:
+            gtts.gTTS(text=extra_text, lang="ar").save("extra.mp3")
+            
+        with open("concat_extra.txt", "w", encoding="utf-8") as f:
+            f.write("file 'narration.mp3'\nfile 'extra.mp3'\n")
+        subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "concat_extra.txt", "-c", "copy", "narration_final.mp3"], check=True)
+        os.replace("narration_final.mp3", "narration.mp3")
+        duration = get_audio_duration("narration.mp3")
+        print(f"  📈 المدة بعد التمديد: {duration / 60:.2f} دقيقة")
+
+    print(f"✅ تم تأكيد استيفاء المدة المطلوبة بنجاح: {duration / 60:.2f} دقيقة!")
     return duration
 
-# --- 5. جلب مشاهد Pexels وتكرارها لتغطية كامل المدة ---
+# --- 5. جلب وتكرار مشاهد Pexels لسد كامل المدة ---
 def prepare_video_footage(keywords: list, target_duration: float, output_dir: str = "clips") -> str:
     print(f"🎥 جاري جلب المشاهد البصرية لتغطية مدة {target_duration / 60:.1f} دقيقة...")
     os.makedirs(output_dir, exist_ok=True)
@@ -261,24 +290,26 @@ def prepare_video_footage(keywords: list, target_duration: float, output_dir: st
             
     return playlist_path
 
-# --- 6. المونتاج والرندر فائق السرعة عبر FFmpeg ---
+# --- 6. رندر ومونتاج FFmpeg المحمي ضد التجمد وتكرار الإطارات ---
 def render_long_documentary(playlist_path: str, audio_path: str, output_path: str = "final_documentary.mp4"):
-    print("⚙️ جاري دمج ومونتاج الوثائقي الطويل (رندر سريع مخصص لـ 20 دقيقة)...")
+    print("⚙️ جاري دمج ومونتاج الوثائقي الطويل (معالجة سريعة وثابتة الإطارات)...")
     
     cmd = [
         "ffmpeg", "-y",
+        "-fflags", "+genpts",
         "-f", "concat", "-safe", "0", "-i", playlist_path,
         "-i", audio_path,
-        "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
+        "-vf", "fps=25,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
         "-c:a", "aac", "-b:a", "192k",
+        "-max_muxing_queue_size", "1024",
         "-shortest",
         output_path
     ]
     subprocess.run(cmd, check=True)
-    print(f"🏆 اكتمل إنتاج الوثائقي بنجاح! مدة الفيديو الآن مطابقة للصوت تماماً (+20 دقيقة).")
+    print(f"🏆 اكتمل إنتاج الوثائقي بنجاح وبدون أي تعليق: {output_path}")
 
-# --- 7. الرفع إلى يوتيوب بالتجزئة ---
+# --- 7. رفع الوثائقي إلى يوتيوب بالتجزئة ---
 def upload_to_youtube(file_path: str, channel_key: str, title: str, description: str):
     print(f"🚀 جاري رفع الوثائقي الطويل إلى يوتيوب [{channel_key}]: \"{title}\"...")
     
@@ -325,8 +356,17 @@ if __name__ == "__main__":
     channel_names = {"ABAAD": "أبعاد جغرافية", "MASHAREE": "مشاريع عملاقة", "MASAR": "مسار"}
     channel_title = channel_names.get(channel_key, channel_key)
     
+    # 1. فكرة عشوائية
     meta = get_random_topic(channel_title)
+    
+    # 2. بناء الصوت البشري الإجباري (+20 دقيقة)
     duration = build_guaranteed_audio(meta["title"], meta["topic"])
+    
+    # 3. تجهيز المشاهد الممتدة
     playlist = prepare_video_footage(meta["search_keywords"], target_duration=duration)
+    
+    # 4. الرندر السريع والثابت
     render_long_documentary(playlist, "narration.mp3", "final_documentary.mp4")
+    
+    # 5. الرفع إلى يوتيوب
     upload_to_youtube("final_documentary.mp4", channel_key, meta["title"], meta["topic"])
