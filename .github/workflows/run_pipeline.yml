@@ -3,10 +3,10 @@ name: Produce and Upload Documentaries
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 12 * * 1' # تشغيل أسبوعي تلقائي
+    - cron: '0 12 * * 1'
 
 jobs:
-  run_pipeline:
+  produce_and_upload:
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
@@ -20,12 +20,12 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install FFmpeg
+      - name: Install System Dependencies (FFmpeg)
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Install Dependencies
+      - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -39,13 +39,31 @@ jobs:
           REFRESH_TOKEN_MASAR: ${{ secrets.REFRESH_TOKEN_MASAR }}
         run: python -u verify_tokens.py
 
-      - name: Produce & Upload (مشاريع عملاقة)
+      - name: Produce & Upload - مشاريع عملاقة
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           REFRESH_TOKEN_MASHAREE: ${{ secrets.REFRESH_TOKEN_MASHAREE }}
-        run: |
-          python -u production_engine.py "مشاريع عملاقة"
-          python -u upload_video.py "MASHAREE"
+        run: python -u long_documentary_publisher.py "MASHAREE"
+
+      - name: Produce & Upload - أبعاد جغرافية
+        if: success()
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          REFRESH_TOKEN_ABAAD: ${{ secrets.REFRESH_TOKEN_ABAAD }}
+        run: python -u long_documentary_publisher.py "ABAAD"
+
+      - name: Produce & Upload - مسار
+        if: success()
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          REFRESH_TOKEN_MASAR: ${{ secrets.REFRESH_TOKEN_MASAR }}
+        run: python -u long_documentary_publisher.py "MASAR"
