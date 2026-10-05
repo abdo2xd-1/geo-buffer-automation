@@ -37,7 +37,6 @@ if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
 
 def get_active_model():
-    """اختيار نموذج الذكاء الاصطناعي النشط تلقائياً"""
     candidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
     for c in candidates:
         try:
@@ -65,14 +64,12 @@ model = get_active_model() if GEMINI_KEY else None
 VOICE_NAME = "ar-EG-ShakirNeural"  # صوت بشري وثائقي طبيعي
 
 def clean_arabic_text(text: str) -> str:
-    """تنظيف النص من الرموز والماركداون لضمان نطق سليم"""
     text = re.sub(r'[*#_`~>\[\]\(\)]', ' ', text)
     text = text.replace('"', ' ').replace("'", ' ')
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 def get_audio_duration(file_path: str) -> float:
-    """قياس مدة الصوت بدقة عبر ffprobe"""
     try:
         cmd = f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{file_path}"'
         res = subprocess.check_output(cmd, shell=True).decode().strip()
@@ -80,23 +77,23 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
-# --- 2. توليد فكرة شورتس خاطفة وسيناريو قصير (30 - 45 ثانية) ---
+# --- 2. توليد فكرة شورتس وسيناريو سريع (30 إلى 45 ثانية كحد أقصى) ---
 def generate_short_idea_and_script() -> dict:
-    print("🎲 جاري ابتكار فكرة شورتس مشوقة وسيناريو قصير عبر Gemini...")
+    print("🎲 جاري ابتكار فكرة شورتس فيروسية وسيناريو مشوق عبر Gemini...")
     prompt = """
     أنت صانع محتوى فيروسي متخصص في يوتيوب شورتس (YouTube Shorts) الوثائقية والغامضة.
     ابتكر فكرة لفيديو شورتس غامض، صادم أو مثير للاهتمام، مع كتابة نص سردي مشوق.
     
     شروط كتابة الشورتس:
     1. Hook أول 3 ثوانٍ: جملة افتتاحية صادمة تخطف الانتباه فوراً.
-    2. الطول: نص مركز يتراوح بين 70 إلى 95 كلمة فقط (ليكون زمن الصوت بين 30 إلى 45 ثانية).
+    2. الطول: نص مركز يتراوح بين 60 إلى 80 كلمة فقط (ليكون زمن الصوت بين 30 إلى 45 ثانية كحد أقصى).
     3. لغة عربية فصحى مشوقة بدون توجيهات إخراجية أو أسماء مشاهد.
     
     أخرج النتيجة بصيغة JSON حصراً:
     {
         "title": "عنوان جذاب جداً مع إيموجي للشورتس",
         "script": "النص الكامل الذي سينطقه المعلق الصوتي مباشرة",
-        "search_keywords": ["3", "كلمات", "بحث", "إنجليزية", "portrait", "nature", "mystery"]
+        "search_keywords": ["3", "كلمات", "بحث", "إنجليزية", "portrait", "mystery"]
     }
     """
     try:
@@ -107,13 +104,18 @@ def generate_short_idea_and_script() -> dict:
         fallback_ideas = [
             {
                 "title": "أغرب مكان محظور على وجه الأرض! 😱",
-                "script": "هل تعلم أن هناك بقعة على كوكبنا ممنوع على أي إنسان دخولها تحت أي ظرف؟ في أعماق المحيط، تقف جزيرة معزولة لا يسكنها إلا أكثر الكائنات فتكاً في العالم. الحكومات فرضت طوقاً عسكرياً صارماً حولها، وكل من حاول الاقتراب منها لم يعد أبداً. ما هو السر الذي تخفيه هذه الأرض المجهولة؟",
+                "script": "هل تعلم أن هناك جزيرة معزولة في المحيط ممنوع على أي بشري الاقتراب منها؟ كل من حاول الهبوط عليها اختفى دون أثر. الحكومات تحيطها بحراسة عسكرية مشددة. ما هو السر المخيف الذي يخفونه هناك؟",
                 "search_keywords": ["mysterious island aerial", "dangerous nature", "ocean waves dark"]
             },
             {
                 "title": "أعظم سر دفن تحت أهرامات الجيزة! 🏛️",
-                "script": "لآلاف السنين، ظن العالم أننا كشفنا كل أسرار الأهرامات، لكن أحدث أجهزة المسح بالأشعة الكونية فجرت مفاجأة غير مسبوقة! فراغ عملاق بحجم طائرة ركاب مخفي في قلب الهرم الأكبر. ممر مغلق بالكامل لم تطأه قدم إنسان منذ زمن الفراعنة. ما الذي كان القدماء حريصين على إخفائه داخل هذا الممر؟",
+                "script": "لآلاف السنين ظننا أننا كشفنا كل أسرار الأهرامات، لكن أحدث مسح كوني فجر مفاجأة مرعبة! فراغ عملاق بحجم طائرة مخفي في قلب الهرم الأكبر، لم تطأه قدم إنسان منذ آلاف السنين. ماذا يوجد بداخله؟",
                 "search_keywords": ["ancient pyramids egypt", "archaeology mystery", "golden desert aerial"]
+            },
+            {
+                "title": "حفرة نهاية العالم: لغز أعماق سيبيريا! ❄️️",
+                "script": "في أقصى صقيع سيبيريا، ظهرت فجأة فوهة عملاقة تبتلع الأرض بعمق مئات الأمتار! العلماء سجلوا أصواتاً مريبة تصدر من باطنها وغازات غريبة تنبعث بلا توقف. هل هي بداية كارثة بيئية أم لغز لم يُفسر؟",
+                "search_keywords": ["mysterious crater aerial", "siberia ice wilderness", "deep cave darkness"]
             }
         ]
         data = random.choice(fallback_ideas)
@@ -149,14 +151,13 @@ def download_vertical_clips(keywords: list, target_duration: float, output_dir: 
     total_footage_sec = 0.0
     
     for kw in keywords:
-        if total_footage_sec >= target_duration + 15:
+        if total_footage_sec >= target_duration + 10:
             break
-        # طلب فيديوهات بوضع رأسي portrait
         url = f"https://api.pexels.com/videos/search?query={kw}&per_page=6&orientation=portrait"
         try:
             res = requests.get(url, headers=headers, timeout=20).json()
             for v in res.get("videos", []):
-                if total_footage_sec >= target_duration + 15:
+                if total_footage_sec >= target_duration + 10:
                     break
                 files = v.get("video_files", [])
                 chosen = next((f for f in files if f.get("height", 0) > f.get("width", 0)), None) or (files[0] if files else None)
@@ -179,13 +180,14 @@ def download_vertical_clips(keywords: list, target_duration: float, output_dir: 
             
     playlist_path = "short_playlist.txt"
     with open(playlist_path, "w", encoding="utf-8") as f:
-        extended_list = downloaded_files * max(2, int((target_duration // max(1, total_footage_sec)) + 1))
+        loops_needed = max(2, int((target_duration // max(1, total_footage_sec)) + 2))
+        extended_list = (downloaded_files * loops_needed)
         for clip in extended_list:
             f.write(f"file '{os.path.abspath(clip)}'\n")
             
     return playlist_path
 
-# --- 5. رندر الشورتس بمقاس 1080x1920 وبسرعة فائقة ---
+# --- 5. رندر الشورتس بمقاس 1080x1920 وبحجم ملف خفيف ومضغوط ---
 def render_short_video(playlist_path: str, audio_path: str, output_path: str = "final_short.mp4"):
     print("⚙️ جاري دمج ومونتاج الشورتس العمودي (1080x1920)...")
     cmd = [
@@ -193,42 +195,72 @@ def render_short_video(playlist_path: str, audio_path: str, output_path: str = "
         "-fflags", "+genpts",
         "-f", "concat", "-safe", "0", "-i", playlist_path,
         "-i", audio_path,
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,format=yuv420p",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
-        "-c:a", "aac", "-b:a", "192k",
+        "-vf", "fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,format=yuv420p",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+        "-b:v", "2500k", "-maxrate", "3000k", "-bufsize", "6000k",
+        "-c:a", "aac", "-b:a", "128k",
         "-max_muxing_queue_size", "1024",
         "-shortest",
         output_path
     ]
     subprocess.run(cmd, check=True)
-    print(f"🎬 اكتمل إنتاج فيديو الشورتس بنجاح: {output_path}")
+    size_mb = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"🎬 اكتمل إنتاج الشورتس بنجاح: {output_path} (حجم الملف: {size_mb:.1f} ميجابايت)")
 
-# --- 6. رفع الفيديو مؤقتاً لتزويد بافر برابط مباشر ---
+# --- 6. رفع الفيديو برابط مباشر ومضمون لبافر مع 4 سيرفرات بديلة ---
 def get_public_video_url(file_path: str) -> str:
-    print("🌐 جاري رفع الفيديو للحصول على رابط مباشر لإرساله إلى Buffer...")
-    # المحاولة 1: Catbox
+    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    print(f"🌐 جاري رفع الفيديو بحجم {size_mb:.1f} ميجابايت للحصول على رابط مباشر لـ Buffer...")
+    
+    # 1. التجربة عبر 0x0.st
     try:
-        url = "https://catbox.moe/user/api.php"
         with open(file_path, "rb") as f:
-            res = requests.post(url, data={"reqtype": "fileupload"}, files={"fileToUpload": f}, timeout=90)
-        if res.status_code == 200 and res.text.startswith("http"):
-            direct_url = res.text.strip()
-            print(f"  🔗 رابط الفيديو المباشر: {direct_url}")
-            return direct_url
+            res = requests.post("https://0x0.st", files={"file": f}, timeout=60)
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            url = res.text.strip()
+            print(f"  🔗 تم الرفع بنجاح عبر 0x0.st: {url}")
+            return url
     except Exception as e:
-        print(f"⚠️ Catbox غير متاح ({e})، تجربة مزود بديل...")
+        print(f"⚠️ 0x0.st: {e}")
 
-    # المحاولة 2: Tmpfiles
+    # 2. التجربة عبر temp.sh
     try:
-        url = "https://tmpfiles.org/api/v1/upload"
         with open(file_path, "rb") as f:
-            res = requests.post(url, files={"file": f}, timeout=90).json()
-        raw_url = res["data"]["url"]
-        direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
-        print(f"  🔗 رابط الفيديو المباشر: {direct_url}")
-        return direct_url
+            res = requests.post("https://temp.sh/upload", files={"file": f}, timeout=60)
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            url = res.text.strip()
+            print(f"  🔗 تم الرفع بنجاح عبر temp.sh: {url}")
+            return url
     except Exception as e:
-        print(f"⚠️ Tmpfiles غير متاح ({e})")
+        print(f"⚠️ temp.sh: {e}")
+
+    # 3. التجربة عبر Litterbox
+    try:
+        with open(file_path, "rb") as f:
+            res = requests.post(
+                "https://litterbox.catbox.moe/resources/internals/api.php",
+                data={"reqtype": "fileupload", "time": "24h"},
+                files={"fileToUpload": f},
+                timeout=60
+            )
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            url = res.text.strip()
+            print(f"  🔗 تم الرفع بنجاح عبر Litterbox: {url}")
+            return url
+    except Exception as e:
+        print(f"⚠️ Litterbox: {e}")
+
+    # 4. التجربة عبر transfer.sh
+    try:
+        fname = os.path.basename(file_path)
+        with open(file_path, "rb") as f:
+            res = requests.put(f"https://transfer.sh/{fname}", data=f, timeout=60)
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            url = res.text.strip()
+            print(f"  🔗 تم الرفع بنجاح عبر transfer.sh: {url}")
+            return url
+    except Exception as e:
+        print(f"⚠️ transfer.sh: {e}")
 
     return ""
 
@@ -238,13 +270,14 @@ def publish_to_buffer(video_url: str, title: str):
     
     if not BUFFER_TOKEN:
         print("❌ خطأ: متغير BUFFER_ACCESS_TOKEN غير موجود في إعدادات Secrets!")
-        return False
+        sys.exit(1)
 
     profile_id = BUFFER_PROFILE_ID
     if not profile_id:
         try:
             prof_res = requests.get(f"https://api.bufferapp.com/1/profiles.json?access_token={BUFFER_TOKEN}", timeout=20).json()
             if isinstance(prof_res, list) and len(prof_res) > 0:
+                # اختيار أول حساب قناة يوتيوب متاح
                 yt_prof = next((p for p in prof_res if p.get("service") in ["youtube", "tiktok", "instagram"]), prof_res[0])
                 profile_id = yt_prof.get("id")
                 print(f"  🎯 تم اختيار حساب Buffer تلقائياً: [{yt_prof.get('formatted_username')} - {yt_prof.get('service')}] (ID: {profile_id})")
@@ -253,7 +286,7 @@ def publish_to_buffer(video_url: str, title: str):
 
     if not profile_id:
         print("❌ لم يتم العثور على Profile ID في Buffer. يرجى إضافة BUFFER_PROFILE_ID إلى Secrets.")
-        return False
+        sys.exit(1)
 
     endpoint = "https://api.bufferapp.com/1/updates/create.json"
     caption_text = f"{title}\n\nهل كنت تعلم هذه المعلومة من قبل؟ شاركنا رأيك في التعليقات! 👇\n\n#Shorts #shorts #معلومات #حقائق #وثائقي #استكشاف"
@@ -262,7 +295,7 @@ def publish_to_buffer(video_url: str, title: str):
         "access_token": BUFFER_TOKEN,
         "profile_ids[]": [profile_id],
         "text": caption_text,
-        "now": "true",  # "true" للنشر الفوري، أو "false" للإضافة لجدول النشر التلقائي في بافر
+        "now": "true",
         "media[video]": video_url,
         "shorten": "false"
     }
@@ -271,14 +304,14 @@ def publish_to_buffer(video_url: str, title: str):
         res = requests.post(endpoint, data=payload, timeout=40)
         res_json = res.json()
         if res.status_code == 200 and res_json.get("success"):
-            print("🎉 تم إرسال الشورتس بنجاح إلى Buffer! جاري النشر التلقائي على قنواتك.")
+            print("🎉 تم إرسال الشورتس بنجاح إلى Buffer! جاري النشر التلقائي على القناة.")
             return True
         else:
             print(f"⚠️ رد Buffer: {res.text}")
-            return False
+            sys.exit(1)
     except Exception as e:
         print(f"❌ فشل الاتصال بواجهة Buffer: {e}")
-        return False
+        sys.exit(1)
 
 # --- نقطة البداية ---
 if __name__ == "__main__":
@@ -292,3 +325,4 @@ if __name__ == "__main__":
         publish_to_buffer(pub_url, short_data["title"])
     else:
         print("❌ تعذر استخراج رابط الفيديو المباشر لإرساله إلى Buffer.")
+        sys.exit(1)
