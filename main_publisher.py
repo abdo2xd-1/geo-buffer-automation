@@ -80,7 +80,7 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
-# --- 2. توليد فكرة وسيناريو الشورتس (30 إلى 45 ثانية كحد أقصى) ---
+# --- 2. توليد فكرة وسيناريو الشورتس (30 إلى 45 ثانية) ---
 def generate_short_idea_and_script() -> dict:
     print("🎲 جاري ابتكار فكرة شورتس فيروسية وسيناريو مشوق عبر Gemini...")
     prompt = """
@@ -239,81 +239,157 @@ def get_public_video_url(file_path: str) -> str:
 
     return ""
 
-# --- 7. الاتصال والنشر على جميع القنوات الثلاث في Buffer ---
+# --- 7. الاتصال والنشر عبر Buffer GraphQL API الجديد ---
+def get_buffer_channels(buffer_token):
+    headers = {
+        "Authorization": f"Bearer {buffer_token}",
+        "Content-Type": "application/json"
+    }
+    graphql_url = "https://api.buffer.com/graphql"
+    q1 = """
+    query {
+      account {
+        organizations {
+          channels {
+            id
+            name
+            service
+          }
+        }
+      }
+    }
+    """
+    try:
+        res = requests.post(graphql_url, json={"query": q1}, headers=headers, timeout=20).json()
+        orgs = res.get("data", {}).get("account", {}).get("organizations", [])
+        channels = []
+        for org in orgs:
+            for ch in org.get("channels", []):
+                channels.append(ch)
+        if channels:
+            return channels
+    except Exception as e:
+        print(f"⚠️ استعلام القنوات 1: {e}")
+
+    q2 = """
+    query {
+      channels {
+        id
+        name
+        service
+      }
+    }
+    """
+    try:
+        res = requests.post(graphql_url, json={"query": q2}, headers=headers, timeout=20).json()
+        channels = res.get("data", {}).get("channels", [])
+        if channels:
+            return channels
+    except Exception as e:
+        print(f"⚠️️ استعلام القنوات 2: {e}")
+
+    fallback = [
+        {"id": "6abace7bea19ca0bde181dff", "name": "Masar | مسار", "service": "youtube"},
+        {"id": "6abace11ea19ca0bde181821", "name": "مشاريع عملاقة | MegaBuilds", "service": "youtube"}
+    ]
+    if BUFFER_PROFILE_ID and BUFFER_PROFILE_ID not in [c["id"] for c in fallback]:
+        fallback.append({"id": BUFFER_PROFILE_ID, "name": "أبعاد جغرافية", "service": "youtube"})
+    return fallback
+
 def publish_to_all_buffer_channels(video_url: str, title: str):
-    print("🚀 جاري الاتصال بـ Buffer لتجهيز النشر على القنوات الثلاث...")
+    print("🚀 جاري الاتصال بـ Buffer GraphQL API لتجهيز النشر على القنوات الثلاث...")
     
     if not BUFFER_TOKEN:
         print("❌ خطأ: متغير BUFFER_ACCESS_TOKEN غير موجود في إعدادات Secrets!")
         sys.exit(1)
 
-    target_profiles = []
-
-    # 1. جلب جميع القنوات المربوطة بحساب Buffer تلقائياً
-    try:
-        prof_req = requests.get(f"https://api.bufferapp.com/1/profiles.json?access_token={BUFFER_TOKEN}", timeout=20)
-        if prof_req.status_code == 200:
-            profiles_data = prof_req.json()
-            if isinstance(profiles_data, list) and len(profiles_data) > 0:
-                for p in profiles_data:
-                    target_profiles.append({
-                        "id": p.get("id"),
-                        "name": p.get("formatted_username") or p.get("service_username") or "قناة غير مسماة",
-                        "service": p.get("service")
-                    })
-    except Exception as e:
-        print(f"⚠️ تعذر الاستعلام التلقائي من Buffer: {e}")
-
-    # 2. في حال فشل الاستعلام، استخدام المعرفات الأساسية للقنوات الثلاث كاحتياطي
-    if not target_profiles:
-        fallback_channels = [
-            {"id": "6abace7bea19ca0bde181dff", "name": "Masar | مسار"},
-            {"id": "6abace11ea19ca0bde181821", "name": "مشاريع عملاقة | MegaBuilds"},
-        ]
-        if BUFFER_PROFILE_ID and BUFFER_PROFILE_ID not in [c["id"] for c in fallback_channels]:
-            fallback_channels.append({"id": BUFFER_PROFILE_ID, "name": "أبعاد جغرافية"})
-        target_profiles = fallback_channels
-
+    target_profiles = get_buffer_channels(BUFFER_TOKEN)
     print(f"📋 سيتم النشر على {len(target_profiles)} قنوات:")
     for tp in target_profiles:
-        print(f"  🔹 {tp['name']} (ID: {tp['id']})")
+        print(f"  🔹 {tp.get('name', 'قناة')} (ID: {tp.get('id')})")
 
+    graphql_url = "https://api.buffer.com/graphql"
+    headers = {
+        "Authorization": f"Bearer {BUFFER_TOKEN}",
+        "Content-Type": "application/json"
+    }
     caption_text = f"{title}\n\nهل كنت تعلم هذه المعلومة من قبل؟ شاركنا رأيك في التعليقات! 👇\n\n#Shorts #shorts #معلومات #حقائق #وثائقي #استكشاف"
-    endpoint = "https://api.bufferapp.com/1/updates/create.json"
-    published_count = 0
 
-    # 3. النشر على كل قناة تباعاً
-    for tp in target_profiles:
-        pid = tp["id"]
-        pname = tp["name"]
-        print(f"\n📤 جاري النشر الآن على قناة: [{pname}]...")
-        
-        payload = {
-            "access_token": BUFFER_TOKEN,
-            "profile_ids[]": [pid],
-            "text": caption_text,
-            "now": "true",
-            "media[video]": video_url,
-            "shorten": "false"
+    mutation_template = """
+    mutation CreatePost($input: CreatePostInput!) {
+      createPost(input: $input) {
+        post {
+          id
         }
+        userErrors {
+          message
+        }
+      }
+    }
+    """
 
-        try:
-            res = requests.post(endpoint, data=payload, timeout=40)
-            res_json = res.json()
-            if res.status_code == 200 and res_json.get("success"):
-                print(f"  🎉 تم النشر بنجاح على [{pname}]!")
-                published_count += 1
-            else:
-                print(f"  ⚠️ رد بافر للقناة [{pname}]: {res.text}")
-        except Exception as e:
-            print(f"  ❌ خطأ أثناء النشر على [{pname}]: {e}")
+    published_count = 0
+    for tp in target_profiles:
+        pid = tp.get("id")
+        pname = tp.get("name")
+        print(f"\n📤 جاري النشر الآن عبر GraphQL على قناة: [{pname}]...")
+
+        payload_attempts = [
+            {
+                "channelId": pid,
+                "text": caption_text,
+                "schedulingType": "now",
+                "attachment": {"video": {"url": video_url}}
+            },
+            {
+                "channelId": pid,
+                "text": caption_text,
+                "schedulingType": "now",
+                "assets": [{"url": video_url}]
+            },
+            {
+                "channelId": pid,
+                "text": caption_text,
+                "schedulingType": "now",
+                "media": [{"url": video_url}]
+            }
+        ]
+
+        channel_success = False
+        for attempt_idx, inp in enumerate(payload_attempts, 1):
+            body = {
+                "query": mutation_template,
+                "variables": {"input": inp}
+            }
+            try:
+                res = requests.post(graphql_url, json=body, headers=headers, timeout=30)
+                res_data = res.json()
+                print(f"  📡 استجابة Buffer GraphQL (محاولة {attempt_idx}): {res_data}")
+
+                errors = res_data.get("errors", [])
+                user_errors = res_data.get("data", {}).get("createPost", {}).get("userErrors", [])
+                post_data = res_data.get("data", {}).get("createPost", {}).get("post")
+
+                if post_data and not user_errors and not errors:
+                    print(f"  🎉 تم النشر بنجاح على [{pname}]! Post ID: {post_data.get('id')}")
+                    published_count += 1
+                    channel_success = True
+                    break
+                elif user_errors:
+                    print(f"  ⚠️ خطأ محتوى: {user_errors}")
+            except Exception as e:
+                print(f"  ⚠️ استثناء اتصال: {e}")
+            time.sleep(1)
+
+        if not channel_success:
+            print(f"  ❌ تعذر إرسال المنشور للقناة [{pname}] عبر المحاولات المتاحة.")
         time.sleep(2)
 
     if published_count > 0:
-        print(f"\n🏆 اكتملت المهمة بنجاح: تم نشر الشورتس على {published_count} من أصل {len(target_profiles)} قنوات!")
+        print(f"\n🏆 اكتملت المهمة بنجاح: تم نشر الشورتس على {published_count} قنوات!")
         return True
     else:
-        print("\n❌ تعذر النشر على أي قناة. تحقق من صلاحيات Buffer Token.")
+        print("\n❌ فشل النشر على القنوات. يرجى مراجعة تفاصيل استجابة GraphQL أعلاه.")
         sys.exit(1)
 
 # --- نقطة البداية ---
