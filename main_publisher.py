@@ -27,11 +27,13 @@ except ImportError:
     subprocess.run([sys.executable, "-m", "pip", "install", "google-generativeai"])
     import google.generativeai as genai
 
-# --- 1. الإعدادات والنموذج الفعال ---
+# --- 1. مفاتيح التشغيل واختيار النموذج الذكي ---
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 PEXELS_KEY = os.getenv("PEXELS_API_KEY")
 BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN")
 BUFFER_PROFILE_ID = os.getenv("BUFFER_PROFILE_ID")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
@@ -61,7 +63,7 @@ def get_active_model():
     return genai.GenerativeModel("gemini-3.8-flash")
 
 model = get_active_model() if GEMINI_KEY else None
-VOICE_NAME = "ar-EG-ShakirNeural"  # صوت بشري وثائقي طبيعي
+VOICE_NAME = "ar-EG-ShakirNeural"  # صوت وثائقي بشري فخم
 
 def clean_arabic_text(text: str) -> str:
     text = re.sub(r'[*#_`~>\[\]\(\)]', ' ', text)
@@ -77,78 +79,112 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
-# --- 2. توليد فكرة شورتس فريدة وعشوائية لكل قناة على حدة ---
-def generate_unique_short_for_channel(channel_name: str) -> dict:
-    print(f"🎲 جاري ابتكار فكرة شورتس حصرية ومميزة ومختلفة لقناة [{channel_name}]...")
-    prompt = f"""
-    أنت صانع محتوى فيروسي متخصص في يوتيوب شورتس (YouTube Shorts) الوثائقية والغامضة.
-    قناتنا الحالية هي: "{channel_name}".
+# --- 2. إرسال إشعار فوري عبر تيليجرام (اختياري) ---
+def send_telegram_alert(message: str):
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+            requests.post(url, json=payload, timeout=10)
+        except Exception:
+            pass
+
+# --- 3. ذاكرة السجل لمنع تكرار الأفكار نهائياً ---
+HISTORY_FILE = "shorts_history.json"
+
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_history(history):
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history[-120:], f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+# --- 4. محرك التنقيح والتحكيم الذاتي للسيناريو الفيروسي ---
+def generate_apex_short(channel_name: str) -> dict:
+    print(f"🧠 [Apex Studio]: جاري توليد وتنقيح سيناريو فيروسي لقناة [{channel_name}]...")
+    history = load_history()
+    recent_titles = [item.get("title", "") for item in history[-25:]]
+    exclude_text = f"ممنوع تكرار هذه المواضيع نهائياً: {', '.join(recent_titles)}" if recent_titles else ""
+
+    prompt_stage1 = f"""
+    أنت العقل المدبر لأكبر قنوات الوثائقيات الفيروسية العالمية (Shorts & Reels).
+    قناتنا هي: "{channel_name}".
+    {exclude_text}
     
-    مهم جداً:
-    - لا تحصر القناة في نطاق ضيق أو مكرر إطلاقاً.
-    - ابتكر موضوعاً عشوائياً ومثيراً وفضولياً يناسب المشاهد العربي. نوّع بحرية مطلقة بين:
-      * ألغاز واكتشافات أثرية صادمة،
-      * غرائب وظواهر كونية أو جغرافية غير مفسرة،
-      * أسرار عسكرية أو تقنية غامضة،
-      * معالم أو مدن مفقودة ومحظورة،
-      * كوارث أو صدف تاريخية غيرت مجرى الأحداث.
+    المطلوب:
+    ابتكر فكرة غامضة ومثيرة للاهتمام للغاية، واكتب سيناريو شورتس باللغة العربية الفصحى.
+    شروط إلزامية:
+    1. Hook الصدمة (أول ثانيتين): سؤال أو حقيقة تمنع التمرير وتثير الذهول فوراً.
+    2. الحبكة: سرد سريع لمعلومات تاريخية أو علمية أو عسكرية موثقة وصادمة.
+    3. The Infinite Loop: اربط الكلمة الأخيرة في السيناريو ببداية الجملة الأولى ليكتمل المعنى ويعيد الفيديو تشغيل نفسه بلا نهاية.
+    4. الطول: من 65 إلى 80 كلمة فقط (ليكون زمن الصوت بين 30 إلى 42 ثانية).
+    5. حدد 5 عبارات بحث بصرية سينمائية بالإنجليزية تناسب مقاطع Pexels.
     
-    شروط كتابة الشورتس:
-    1. Hook أول 3 ثوانٍ: جملة افتتاحية صادمة تخطف الانتباه فوراً.
-    2. الطول: نص مركز يتراوح بين 60 إلى 80 كلمة فقط (ليكون زمن الصوت بين 30 إلى 45 ثانية كحد أقصى).
-    3. لغة عربية فصحى مشوقة بدون أي توجيهات إخراجية أو أسماء مشاهد.
-    
-    أخرج النتيجة بصيغة JSON حصراً:
+    أخرج الرد بصيغة JSON حصراً:
     {{
-        "title": "عنوان جذاب جداً مع إيموجي للشورتس",
-        "script": "النص الكامل الذي سينطقه المعلق الصوتي مباشرة",
-        "search_keywords": ["3", "كلمات", "بحث", "إنجليزية", "portrait", "mystery"]
+        "title": "عنوان مثير مع إيموجي",
+        "script": "النص المنطوق فقط",
+        "scene_keywords": ["keyword 1", "keyword 2", "keyword 3", "keyword 4", "keyword 5"]
     }}
     """
     try:
-        res = model.generate_content(prompt)
-        cleaned = res.text.strip().replace("```json", "").replace("```", "")
-        data = json.loads(cleaned)
+        res1 = model.generate_content(prompt_stage1)
+        raw_json = res1.text.strip().replace("```json", "").replace("```", "")
+        data = json.loads(raw_json)
+
+        # فحص جودة النص وتحسين تدفقه
+        prompt_refine = f"""
+        أنت ناقد محتوى فيروسي متخصص في فحص الـ Retention.
+        راجع هذا السيناريو:
+        العنوان: {data['title']}
+        النص: {data['script']}
+        
+        عدّل النص ليصبح أكثر إحكاماً وجاذبية وحبساً للأنفاس، مع التأكد من أن:
+        1. الإيقاع سريع وخالٍ من أي حشو لغوي.
+        2. الجملة الأخيرة تندمج بسلاسة فائقة مع الجملة الأولى لتطبيق الـ Infinite Loop.
+        3. الطول يظل بين 65 و 80 كلمة.
+        
+        أخرج فقط النص المنقح النهائي المقروء دون أي مقدمات أو علامات إضافية.
+        """
+        res2 = model.generate_content(prompt_refine)
+        if res2.text and len(res2.text.split()) >= 45:
+            data['script'] = res2.text.strip()
     except Exception:
         fallback_pool = [
             {
                 "title": "أغرب مكان محظور على وجه الأرض! 😱",
-                "script": "هل تعلم أن هناك جزيرة معزولة في المحيط ممنوع على أي بشري الاقتراب منها؟ كل من حاول الهبوط عليها اختفى دون أثر. الحكومات تحيطها بحراسة عسكرية مشددة. ما هو السر المخيف الذي يخفونه هناك؟",
-                "search_keywords": ["mysterious island aerial", "dangerous nature", "ocean waves dark"]
+                "script": "هذا هو المكان الوحيد على كوكبنا الذي يُمنع أي إنسان من دخوله تحت تهديد السلاح. في أعماق المحيط، تقف جزيرة معزولة لا يسكنها إلا أكثر الكائنات فتكاً في العالم. كل من حاول الاقتراب منها اختفى دون أثر، ولذلك سيبقى لغزها غامضاً لأن هذا هو المكان الوحيد...",
+                "scene_keywords": ["isolated island aerial", "military patrol ocean", "dark waves mystery", "restricted area forbidden", "ocean storm dark"]
             },
             {
                 "title": "أعظم سر دفن تحت أهرامات الجيزة! 🏛️",
-                "script": "لآلاف السنين ظننا أننا كشفنا كل أسرار الأهرامات، لكن أحدث مسح كوني فجر مفاجأة مرعبة! فراغ عملاق بحجم طائرة مخفي في قلب الهرم الأكبر، لم تطأه قدم إنسان منذ آلاف السنين. ماذا يوجد بداخله؟",
-                "search_keywords": ["ancient pyramids egypt", "archaeology mystery", "golden desert aerial"]
-            },
-            {
-                "title": "حفرة نهاية العالم: لغز أعماق سيبيريا! ❄️",
-                "script": "في أقصى صقيع سيبيريا، ظهرت فجأة فوهة عملاقة تبتلع الأرض بعمق مئات الأمتار! العلماء سجلوا أصواتاً مريبة تصدر من باطنها وغازات غريبة تنبعث بلا توقف. هل هي بداية كارثة بيئية أم لغز لم يُفسر؟",
-                "search_keywords": ["mysterious crater aerial", "siberia ice wilderness", "deep cave darkness"]
-            },
-            {
-                "title": "مدينة تحت الرمال: لغز الربع الخالي! 🏜️",
-                "script": "في قلب صحراء الربع الخالي، رصدت الأقمار الصناعية أطلالاً لمدينة ضخمة مطمورة تحت الكثبان! أساطير تحكي عن حضارة امتلكت ثراءً خيالياً ثم اختفت في ليلة واحدة. هل وجد العلماء إرم ذات العماد؟",
-                "search_keywords": ["desert ruins sand", "ancient city aerial", "empty quarter mystery"]
-            },
-            {
-                "title": "الباب المغلق الذي يخشى العلماء فتحه! 🚪",
-                "script": "في أحد أقدم المعابد في الهند، يوجد باب سري لا يملك أقفالاً ولا مفاتيح، ولم يُفتح منذ مئات السنين! الأساطير تحذر من أن فتحه سيجلب كارثة عالمية، وحتى اليوم ترفض السلطات لمسه. ما الذي يقبع خلفه؟",
-                "search_keywords": ["ancient temple secret", "mysterious door vault", "dark history relics"]
+                "script": "هذا التجويف السري في قلب الهرم الأكبر حير كل أجهزة المسح بالأشعة الكونية. فراغ عملاق بحجم طائرة ركاب، مغلق بإحكام منذ آلاف السنين، ولم يجرؤ أحد على فتحه حتى الآن، خوفاً من كشف الحقيقة الصادمة عن هذا التجويف السري...",
+                "scene_keywords": ["pyramids giza 4k", "secret ancient chamber", "cosmic scan archaeology", "egypt desert golden", "ancient hieroglyphs"]
             }
         ]
         data = random.choice(fallback_pool)
-        
-    print(f"  💡 عنوان الشورتس لـ [{channel_name}]: {data['title']}")
+
+    history.append({"title": data["title"], "time": time.time()})
+    save_history(history)
+    print(f"  💡 العنوان المعتمد لـ [{channel_name}]: {data['title']}")
     return data
 
-# --- 3. توليد صوت الشورتس ---
+# --- 5. توليد الصوت البشري الفخم ---
 async def generate_short_voice_async(text: str, output_path: str):
     comm = edge_tts.Communicate(text, VOICE_NAME, rate="-2%")
     await comm.save(output_path)
 
 def create_short_audio(script_text: str, output_path: str) -> float:
-    print(f"🎙️ جاري توليد صوت الشورتس البشري ({VOICE_NAME})...")
+    print(f"🎙️ جاري توليد التعليق الصوتي الوثائقي الإذاعي ({VOICE_NAME})...")
     cleaned = clean_arabic_text(script_text)
     try:
         asyncio.run(generate_short_voice_async(cleaned, output_path))
@@ -156,12 +192,12 @@ def create_short_audio(script_text: str, output_path: str) -> float:
         gtts.gTTS(text=cleaned, lang="ar").save(output_path)
         
     dur = get_audio_duration(output_path)
-    print(f"🎧 مدة التعليق الصوتي: {dur:.1f} ثانية")
+    print(f"🎧 مدة الصوت: {dur:.1f} ثانية")
     return dur
 
-# --- 4. جلب المشاهد الرأسية (9:16) من Pexels ---
+# --- 6. جلب مشاهد Pexels الرأسية المتنوعة ---
 def download_vertical_clips(keywords: list, target_duration: float, output_dir: str) -> str:
-    print(f"📱 جاري تنزيل مشاهد عمودية (Shorts 9:16) لتغطية {target_duration:.1f} ثانية...")
+    print(f"📱 جاري جلب لقطات سينمائية رأسية وتوزيعها بإيقاع سريع...")
     os.makedirs(output_dir, exist_ok=True)
     headers = {"Authorization": PEXELS_KEY}
     
@@ -170,13 +206,13 @@ def download_vertical_clips(keywords: list, target_duration: float, output_dir: 
     total_footage_sec = 0.0
     
     for kw in keywords:
-        if total_footage_sec >= target_duration + 10:
+        if total_footage_sec >= target_duration + 12:
             break
         url = f"https://api.pexels.com/videos/search?query={kw}&per_page=6&orientation=portrait"
         try:
             res = requests.get(url, headers=headers, timeout=20).json()
             for v in res.get("videos", []):
-                if total_footage_sec >= target_duration + 10:
+                if total_footage_sec >= target_duration + 12:
                     break
                 files = v.get("video_files", [])
                 chosen = next((f for f in files if f.get("height", 0) > f.get("width", 0)), None) or (files[0] if files else None)
@@ -193,7 +229,6 @@ def download_vertical_clips(keywords: list, target_duration: float, output_dir: 
                 downloaded_files.append(c_path)
                 total_footage_sec += dur
                 clip_counter += 1
-                print(f"  📥 تم تحميل كليب رأسي {clip_counter} ({dur:.1f} ثانية)")
         except Exception:
             continue
             
@@ -206,32 +241,111 @@ def download_vertical_clips(keywords: list, target_duration: float, output_dir: 
             
     return playlist_path
 
-# --- 5. رندر الشورتس العمودي السريع ---
-def render_short_video(playlist_path: str, audio_path: str, output_path: str):
-    print("⚙️ جاري دمج ومونتاج الشورتس العمودي (1080x1920)...")
+# --- 7. الترجمة المتحركة بنمط الكاريوكي الفسفوري ثلاثي الأبعاد ---
+def generate_karaoke_ass(script_text: str, total_duration: float, output_ass: str = "subs.ass") -> str:
+    words = script_text.split()
+    if not words:
+        words = [script_text]
+        
+    chunk_size = 3
+    chunks = [words[i:i + chunk_size] for i in range(0, len(words), chunk_size)]
+    time_per_chunk = max(1.0, total_duration / len(chunks))
+    
+    header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,DejaVu Sans,72,&H0000FFFF,&H000000FF,&H00000000,&HB0000000,-1,0,0,0,100,100,0,0,1,7,5,2,40,40,440,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    events = []
+    current_time = 0.3
+    for chunk in chunks:
+        start_t = current_time
+        end_t = min(total_duration, current_time + time_per_chunk)
+        start_str = f"0:{int(start_t//60):02d}:{start_t%60:05.2f}"
+        end_str = f"0:{int(end_t//60):02d}:{end_t%60:05.2f}"
+        line_text = clean_arabic_text(" ".join(chunk))
+        events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{{\\b1\\c&H00FFFF&}}{line_text}{{\\r}}")
+        current_time = end_t
+
+    with open(output_ass, "w", encoding="utf-8") as f:
+        f.write(header + "\n".join(events))
+    return output_ass
+
+# --- 8. هندسة صوتية ثلاثية الطبقات (Ambience + Heartbeat Pulse + Sub-Drop) ---
+def generate_apex_soundtrack(duration: float, output_path: str = "soundtrack.mp3"):
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi", "-i", "sine=frequency=46:sample_rate=44100",
+        "-f", "lavfi", "-i", "sine=frequency=64:sample_rate=44100",
+        "-filter_complex",
+        "[0:a]volume=0.07[amb];"
+        "[1:a]tremolo=f=1.6:d=0.75,lowpass=f=180,volume=0.10[pulse];"
+        "anoisesrc=d=2:c=pink:r=44100,lowpass=f=95,volume=0.22[drop];"
+        "[amb][pulse]amix=inputs=2[bed];"
+        "[bed][drop]amix=inputs=2:duration=first[aout]",
+        "-map", "[aout]",
+        "-t", str(duration + 2),
+        output_path
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return output_path
+
+# --- 9. رندر سينمائي متكامل (Apex Cinema Mastering) ---
+def render_apex_short(playlist_path: str, voice_path: str, script_text: str, channel_name: str, output_path: str):
+    print("🎬 [Render]: جاري تطبيق المونتاج السينمائي المتكامل (Film Look + Dynamic Progress + 3D Subs)...")
+    voice_dur = get_audio_duration(voice_path)
+    sfx_path = generate_apex_soundtrack(voice_dur, "sfx.mp3")
+    ass_path = generate_karaoke_ass(script_text, voice_dur, "subs.ass")
+
+    audio_chain = (
+        "[1:a]highpass=f=75,equalizer=f=120:width_type=o:width=1.6:g=4.2,"
+        "equalizer=f=3500:width_type=o:width=1.3:g=3.0,loudnorm=I=-14:TP=-1.5:LRA=7[voice];"
+        "[2:a]volume=0.12[sfx];"
+        "[voice][sfx]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+    )
+
+    clean_channel_tag = clean_arabic_text(channel_name.split('|')[0].strip())
+
+    video_chain = (
+        "[0:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,"
+        "eq=contrast=1.17:saturation=1.26:brightness=-0.01,vignette=angle=0.46,"
+        "noise=alls=11:allf=t+u,"
+        f"drawtext=text='{clean_channel_tag}':fontcolor=white@0.35:fontsize=36:x=50:y=70:box=1:boxcolor=black@0.25:boxborderw=10,"
+        f"subtitles={ass_path}[vgraded];"
+        f"color=c=yellow:s=1080x14[pbar];"
+        f"[vgraded][pbar]overlay=x='-W+W*(t/{voice_dur:.2f})':y=H-14:shortest=1[vout]"
+    )
+
     cmd = [
         "ffmpeg", "-y",
         "-fflags", "+genpts",
         "-f", "concat", "-safe", "0", "-i", playlist_path,
-        "-i", audio_path,
-        "-vf", "fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,format=yuv420p",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
-        "-b:v", "2500k", "-maxrate", "3000k", "-bufsize", "6000k",
-        "-c:a", "aac", "-b:a", "128k",
+        "-i", voice_path,
+        "-i", sfx_path,
+        "-filter_complex", f"{video_chain};{audio_chain}",
+        "-map", "[vout]",
+        "-map", "[aout]",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
+        "-b:v", "2800k", "-maxrate", "3500k", "-bufsize", "6000k",
+        "-c:a", "aac", "-b:a", "192k",
         "-max_muxing_queue_size", "1024",
         "-shortest",
         output_path
     ]
     subprocess.run(cmd, check=True)
     size_mb = os.path.getsize(output_path) / (1024 * 1024)
-    print(f"🎬 اكتمل إنتاج الشورتس بنجاح: {output_path} (حجم الملف: {size_mb:.1f} ميجابايت)")
+    print(f"🏆 اكتمل إنتاج فيلم الشورتس بمستوى (Apex Studio Grade): {output_path} ({size_mb:.1f} ميجابايت)")
 
-# --- 6. رفع الفيديو برابط مباشر يقبله Buffer 100% ---
+# --- 10. الرفع برابط مباشر موثوق ---
 def get_public_video_url(file_path: str) -> str:
-    size_mb = os.path.getsize(file_path) / (1024 * 1024)
-    print(f"🌐 جاري رفع الفيديو بحجم {size_mb:.1f} ميجابايت للحصول على رابط مباشر لـ Buffer...")
-
-    # 1. Catbox الرسمي عبر curl (رابط MP4 مباشر وثابت)
+    print(f"🌐 جاري رفع الفيديو للحصول على رابط مباشر لخوادم Buffer...")
     try:
         cmd = ["curl", "-s", "-F", "reqtype=fileupload", "-F", f"fileToUpload=@{file_path}", "https://catbox.moe/user/api.php"]
         res = subprocess.check_output(cmd, timeout=60).decode().strip()
@@ -239,9 +353,8 @@ def get_public_video_url(file_path: str) -> str:
             print(f"  🔗 تم الرفع بنجاح عبر Catbox: {res}")
             return res
     except Exception as e:
-        print(f"⚠️ Catbox curl: {e}")
+        print(f"⚠️ Catbox: {e}")
 
-    # 2. Litterbox المؤقت عبر curl
     try:
         cmd = ["curl", "-s", "-F", "reqtype=fileupload", "-F", "time=24h", "-F", f"fileToUpload=@{file_path}", "https://litterbox.catbox.moe/resources/internals/api.php"]
         res = subprocess.check_output(cmd, timeout=60).decode().strip()
@@ -249,9 +362,8 @@ def get_public_video_url(file_path: str) -> str:
             print(f"  🔗 تم الرفع بنجاح عبر Litterbox: {res}")
             return res
     except Exception as e:
-        print(f"⚠️ Litterbox curl: {e}")
+        print(f"⚠️ Litterbox: {e}")
 
-    # 3. Uguu.se عبر curl
     try:
         cmd = ["curl", "-s", "-F", f"files[]=@{file_path}", "https://uguu.se/upload"]
         res_raw = subprocess.check_output(cmd, timeout=60).decode().strip()
@@ -261,61 +373,27 @@ def get_public_video_url(file_path: str) -> str:
             print(f"  🔗 تم الرفع بنجاح عبر Uguu: {url}")
             return url
     except Exception as e:
-        print(f"⚠️ Uguu curl: {e}")
-
-    # 4. 0x0.st عبر curl
-    try:
-        cmd = ["curl", "-s", "-F", f"file=@{file_path}", "https://0x0.st"]
-        res = subprocess.check_output(cmd, timeout=60).decode().strip()
-        if res.startswith("http"):
-            print(f"  🔗 تم الرفع بنجاح عبر 0x0.st: {res}")
-            return res
-    except Exception as e:
-        print(f"⚠️ 0x0.st curl: {e}")
+        print(f"⚠️ Uguu: {e}")
 
     return ""
 
-# --- 7. قائمة القنوات وواجهة Buffer GraphQL ---
+# --- 11. النشر عبر Buffer GraphQL API مع التقارير ---
 def get_buffer_channels(buffer_token):
-    headers = {
-        "Authorization": f"Bearer {buffer_token}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {buffer_token}", "Content-Type": "application/json"}
     graphql_url = "https://api.buffer.com"
-    
     try:
-        q_orgs = """
-        query {
-          account {
-            organizations {
-              id
-              name
-            }
-          }
-        }
-        """
-        res = requests.post(graphql_url, json={"query": q_orgs}, headers=headers, timeout=20).json()
+        res = requests.post(graphql_url, json={"query": "query { account { organizations { id } } }"}, headers=headers, timeout=20).json()
         orgs = res.get("data", {}).get("account", {}).get("organizations", [])
         channels = []
         for org in orgs:
             org_id = org.get("id")
-            q_chan = """
-            query GetChannels($input: ChannelsInput!) {
-              channels(input: $input) {
-                id
-                name
-                service
-              }
-            }
-            """
-            c_res = requests.post(graphql_url, json={"query": q_chan, "variables": {"input": {"organizationId": org_id}}}, headers=headers, timeout=20).json()
-            ch_list = c_res.get("data", {}).get("channels", [])
-            for c in ch_list:
+            c_res = requests.post(graphql_url, json={"query": "query GetChannels($input: ChannelsInput!) { channels(input: $input) { id name service } }", "variables": {"input": {"organizationId": org_id}}}, headers=headers, timeout=20).json()
+            for c in c_res.get("data", {}).get("channels", []):
                 channels.append(c)
         if channels:
             return channels
-    except Exception as e:
-        print(f"⚠️ استعلام القنوات من GraphQL: {e}")
+    except Exception:
+        pass
 
     fallback = [
         {"id": "6abace7bea19ca0bde181dff", "name": "مسار | Masar", "service": "youtube"},
@@ -326,10 +404,7 @@ def get_buffer_channels(buffer_token):
 
 def send_short_to_channel(channel_id: str, channel_name: str, video_url: str, title: str) -> bool:
     graphql_url = "https://api.buffer.com"
-    headers = {
-        "Authorization": f"Bearer {BUFFER_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {BUFFER_TOKEN}", "Content-Type": "application/json"}
     caption_text = f"{title}\n\nهل كنت تعلم هذه المعلومة من قبل؟ شاركنا رأيك في التعليقات! 👇\n\n#Shorts #shorts #معلومات #حقائق #وثائقي #استكشاف"
 
     mutation_query = """
@@ -338,7 +413,6 @@ def send_short_to_channel(channel_id: str, channel_name: str, video_url: str, ti
         ... on PostActionSuccess {
           post {
             id
-            text
           }
         }
         ... on MutationError {
@@ -353,13 +427,7 @@ def send_short_to_channel(channel_id: str, channel_name: str, video_url: str, ti
         "text": caption_text,
         "schedulingType": "automatic",
         "mode": "shareNow",
-        "assets": [
-            {
-                "video": {
-                    "url": video_url
-                }
-            }
-        ],
+        "assets": [{"video": {"url": video_url}}],
         "metadata": {
             "youtube": {
                 "title": title[:100],
@@ -370,78 +438,57 @@ def send_short_to_channel(channel_id: str, channel_name: str, video_url: str, ti
         }
     }
 
-    body = {
-        "query": mutation_query,
-        "variables": {"input": inp_data}
-    }
-
     try:
-        res = requests.post(graphql_url, json=body, headers=headers, timeout=40)
+        res = requests.post(graphql_url, json=mutation_query, variables={"input": inp_data}, headers=headers, timeout=40)
         res_data = res.json()
         data_result = res_data.get("data", {}).get("createPost", {})
         post_info = data_result.get("post")
-        err_msg = data_result.get("message")
-        top_errors = res_data.get("errors")
 
         if post_info and post_info.get("id"):
             print(f"  🎉 تم النشر بنجاح على [{channel_name}]! Post ID: {post_info.get('id')}")
+            send_telegram_alert(f"🚀 <b>تم نشر شورتس جديد!</b>\n📺 القناة: {channel_name}\n📌 العنوان: {title}\n🔗 الرابط: {video_url}")
             return True
-        elif err_msg:
-            print(f"  ⚠️ رسالة بافر: {err_msg}")
-        elif top_errors:
-            print(f"  ⚠️ خطأ الاستعلام: {top_errors[0].get('message')}")
+        else:
+            print(f"  ⚠️ استجابة Buffer: {data_result.get('message') or res_data.get('errors')}")
     except Exception as e:
-        print(f"  ⚠️ استثناء اتصال: {e}")
+        print(f"  ⚠️ خطأ اتصال: {e}")
 
     return False
 
-# --- نقطة البداية: إنتاج فيديو مستقل تماماً لكل قناة ونشره ---
+# --- نقطة البداية ---
 if __name__ == "__main__":
     if not BUFFER_TOKEN:
         print("❌ خطأ: متغير BUFFER_ACCESS_TOKEN غير موجود في إعدادات Secrets!")
         sys.exit(1)
 
     channels = get_buffer_channels(BUFFER_TOKEN)
-    print(f"🚀 بدء أتمتة إنتاج ونشر فيديوهات Shorts مستقلة لـ {len(channels)} قنوات...")
+    print(f"🚀 بدء تشغيل منظومة Apex Studio لإنتاج الشورتس لـ {len(channels)} قنوات...")
 
     success_count = 0
     for idx, ch in enumerate(channels, 1):
         ch_id = ch.get("id")
         ch_name = ch.get("name", f"قناة {idx}")
-        print(f"\n{'='*50}")
-        print(f"🎬 [القناة {idx}/{len(channels)}]: تجهيز فيديو شورتس مخصص وحصري لـ [{ch_name}]")
-        print(f"{'='*50}")
+        print(f"\n{'='*55}")
+        print(f"🎬 [القناة {idx}/{len(channels)}]: صناعة فيلم شورتس استثنائي لقناة [{ch_name}]")
+        print(f"{'='*55}")
 
-        # 1. ابتكار فكرة وسيناريو فريد وعشوائي تماماً لهذه القناة
-        short_data = generate_unique_short_for_channel(ch_name)
-        
-        # 2. توليد صوت مستقل
+        short_data = generate_apex_short(ch_name)
         audio_file = f"narration_{idx}.mp3"
         duration = create_short_audio(short_data["script"], audio_file)
         
-        # 3. جلب مشاهد Pexels عمودية خاصة بموضوع الفيديو
         clips_dir = f"clips_ch_{idx}"
-        playlist = download_vertical_clips(short_data["search_keywords"], target_duration=duration, output_dir=clips_dir)
+        playlist = download_vertical_clips(short_data["scene_keywords"], target_duration=duration, output_dir=clips_dir)
         
-        # 4. رندر المقطع
         video_file = f"final_short_{idx}.mp4"
-        render_short_video(playlist, audio_file, video_file)
+        render_apex_short(playlist, audio_file, short_data["script"], ch_name, video_file)
         
-        # 5. رفع الفيديو برابط مباشر
         pub_url = get_public_video_url(video_file)
-        
-        # 6. النشر على القناة المحددة في بافر
-        if pub_url:
-            if send_short_to_channel(ch_id, ch_name, pub_url, short_data["title"]):
-                success_count += 1
-        else:
-            print(f"❌ تعذر استخراج رابط الفيديو المباشر لـ [{ch_name}].")
-
+        if pub_url and send_short_to_channel(ch_id, ch_name, pub_url, short_data["title"]):
+            success_count += 1
         time.sleep(3)
 
-    print(f"\n{'='*50}")
+    print(f"\n{'='*55}")
     if success_count > 0:
-        print(f"🏆 تم إنتاج ونشر {success_count} فيديوهات شورتس مختلفة وحصرية بنجاح على قنواتك!")
+        print(f"🏆 تم بنجاح إنتاج ونشر {success_count} أفلام شورتس سينمائية متطورة على قنواتك!")
     else:
-        print("❌ تعذر نشر الفيديوهات على القنوات. يرجى مراجعة السجلات.")
         sys.exit(1)
