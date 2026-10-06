@@ -31,7 +31,6 @@ except ImportError:
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 PEXELS_KEY = os.getenv("PEXELS_API_KEY")
 BUFFER_TOKEN = os.getenv("BUFFER_ACCESS_TOKEN")
-BUFFER_PROFILE_ID = os.getenv("BUFFER_PROFILE_ID")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -53,7 +52,7 @@ def get_active_model():
     return None
 
 model = get_active_model()
-VOICE_NAME = "ar-EG-ShakirNeural"  # صوت المعلق الوثائقي الإذاعي
+VOICE_NAME = "ar-EG-ShakirNeural"
 
 def clean_arabic_text(text: str) -> str:
     text = re.sub(r'[*#_`~>\[\]\(\)]', ' ', text)
@@ -99,7 +98,6 @@ def save_history(history):
 
 # --- 3. محرك الذكاء الاصطناعي المقاوم للحظر الجغرافي ---
 def query_ai_robust(prompt: str) -> str:
-    # 1. Gemini
     if model:
         try:
             res = model.generate_content(prompt)
@@ -108,7 +106,6 @@ def query_ai_robust(prompt: str) -> str:
         except Exception as e:
             print(f"⚠️ تنبيه Gemini ({e})، جاري التحويل للمحرك البديل العالمي...")
 
-    # 2. محرك بديل عالمي مفتوح (بدون قيود جغرافية)
     try:
         url = "https://text.pollinations.ai/"
         headers = {"Content-Type": "application/json"}
@@ -161,7 +158,6 @@ def generate_apex_short(channel_name: str) -> dict:
             cleaned = ai_raw.replace("```json", "").replace("```", "").strip()
             data = json.loads(cleaned)
             
-            # محاولة تنقيح ثانية إن أمكن
             prompt_refine = f"راجع هذا النص واجعله أكثر سرعة وإثارة مع الحفاظ على طوله (65-80 كلمة) وربط نهايته ببدايته: {data['script']}"
             refined = query_ai_robust(prompt_refine)
             if refined and len(refined.split()) >= 45:
@@ -174,7 +170,6 @@ def generate_apex_short(channel_name: str) -> dict:
         except Exception:
             pass
 
-    # بنك الطوارئ الداخلي
     fallback_pool = [
         {
             "title": "أغرب مكان محظور على وجه الأرض! 😱",
@@ -373,7 +368,7 @@ def get_public_video_url(file_path: str) -> str:
             print(f"  🔗 تم الرفع بنجاح عبر Catbox: {res}")
             return res
     except Exception as e:
-        print(f"⚠️ Catbox: {e}")
+        print(f"⚠️️ Catbox: {e}")
 
     try:
         cmd = ["curl", "-s", "-F", "reqtype=fileupload", "-F", "time=24h", "-F", f"fileToUpload=@{file_path}", "https://litterbox.catbox.moe/resources/internals/api.php"]
@@ -382,7 +377,7 @@ def get_public_video_url(file_path: str) -> str:
             print(f"  🔗 تم الرفع بنجاح عبر Litterbox: {res}")
             return res
     except Exception as e:
-        print(f"⚠️ Litterbox: {e}")
+        print(f"⚠️️ Litterbox: {e}")
 
     try:
         cmd = ["curl", "-s", "-F", f"files[]=@{file_path}", "https://uguu.se/upload"]
@@ -397,30 +392,17 @@ def get_public_video_url(file_path: str) -> str:
 
     return ""
 
-# --- 11. النشر عبر Buffer GraphQL API مع التقارير ---
-def get_buffer_channels(buffer_token):
-    headers = {"Authorization": f"Bearer {buffer_token}", "Content-Type": "application/json"}
-    graphql_url = "https://api.buffer.com"
-    try:
-        res = requests.post(graphql_url, json={"query": "query { account { organizations { id } } }"}, headers=headers, timeout=20).json()
-        orgs = res.get("data", {}).get("account", {}).get("organizations", [])
-        channels = []
-        for org in orgs:
-            org_id = org.get("id")
-            c_res = requests.post(graphql_url, json={"query": "query GetChannels($input: ChannelsInput!) { channels(input: $input) { id name service } }", "variables": {"input": {"organizationId": org_id}}}, headers=headers, timeout=20).json()
-            for c in c_res.get("data", {}).get("channels", []):
-                channels.append(c)
-        if channels:
-            return channels
-    except Exception:
-        pass
+# --- 11. قنوات Buffer ودعم الـ Matrix المباشر ---
+CHANNELS_MAP = {
+    "MASAR": {"id": "6abace7bea19ca0bde181dff", "name": "مسار | Masar"},
+    "MASHAREE": {"id": "6abace11ea19ca0bde181821", "name": "مشاريع عملاقة | MegaBuilds"},
+    "ABAAD": {"id": "6abacd06ea19ca0bde180ef9", "name": "أبعاد جغرافية | Abaad"}
+}
 
-    fallback = [
-        {"id": "6abace7bea19ca0bde181dff", "name": "مسار | Masar", "service": "youtube"},
-        {"id": "6abace11ea19ca0bde181821", "name": "مشاريع عملاقة | MegaBuilds", "service": "youtube"},
-        {"id": "6abacd06ea19ca0bde180ef9", "name": "أبعاد جغرافية | Abaad", "service": "youtube"}
-    ]
-    return fallback
+def get_target_channels(channel_arg=None):
+    if channel_arg and channel_arg.upper() in CHANNELS_MAP:
+        return [CHANNELS_MAP[channel_arg.upper()]]
+    return list(CHANNELS_MAP.values())
 
 def send_short_to_channel(channel_id: str, channel_name: str, video_url: str, title: str) -> bool:
     graphql_url = "https://api.buffer.com"
@@ -458,8 +440,14 @@ def send_short_to_channel(channel_id: str, channel_name: str, video_url: str, ti
         }
     }
 
+    # القالب الصحيح: دمج الاستعلام والمتغيرات معاً في قاموس json
+    payload = {
+        "query": mutation_query,
+        "variables": {"input": inp_data}
+    }
+
     try:
-        res = requests.post(graphql_url, json=mutation_query, variables={"input": inp_data}, headers=headers, timeout=40)
+        res = requests.post(graphql_url, json=payload, headers=headers, timeout=40)
         res_data = res.json()
         data_result = res_data.get("data", {}).get("createPost", {})
         post_info = data_result.get("post")
@@ -475,40 +463,41 @@ def send_short_to_channel(channel_id: str, channel_name: str, video_url: str, ti
 
     return False
 
-# --- نقطة البداية ---
+# --- نقطة البداية الداعمة للـ Matrix والتشغيل الفردي ---
 if __name__ == "__main__":
     if not BUFFER_TOKEN:
         print("❌ خطأ: متغير BUFFER_ACCESS_TOKEN غير موجود في إعدادات Secrets!")
         sys.exit(1)
 
-    channels = get_buffer_channels(BUFFER_TOKEN)
-    print(f"🚀 بدء تشغيل منظومة Apex Studio لإنتاج الشورتس لـ {len(channels)} قنوات...")
+    target_channel_key = sys.argv[1] if len(sys.argv) > 1 else None
+    channels = get_target_channels(target_channel_key)
+    print(f"🚀 بدء أتمتة Matrix Shorts لـ {len(channels)} قنوات...")
 
     success_count = 0
     for idx, ch in enumerate(channels, 1):
         ch_id = ch.get("id")
         ch_name = ch.get("name", f"قناة {idx}")
         print(f"\n{'='*55}")
-        print(f"🎬 [القناة {idx}/{len(channels)}]: صناعة فيلم شورتس استثنائي لقناة [{ch_name}]")
+        print(f"🎬 صناعة فيلم شورتس استثنائي لقناة [{ch_name}]")
         print(f"{'='*55}")
 
         short_data = generate_apex_short(ch_name)
-        audio_file = f"narration_{idx}.mp3"
+        audio_file = f"narration_{ch_id}.mp3"
         duration = create_short_audio(short_data["script"], audio_file)
         
-        clips_dir = f"clips_ch_{idx}"
+        clips_dir = f"clips_{ch_id}"
         playlist = download_vertical_clips(short_data["scene_keywords"], target_duration=duration, output_dir=clips_dir)
         
-        video_file = f"final_short_{idx}.mp4"
+        video_file = f"final_short_{ch_id}.mp4"
         render_apex_short(playlist, audio_file, short_data["script"], ch_name, video_file)
         
         pub_url = get_public_video_url(video_file)
         if pub_url and send_short_to_channel(ch_id, ch_name, pub_url, short_data["title"]):
             success_count += 1
-        time.sleep(3)
+        time.sleep(2)
 
     print(f"\n{'='*55}")
     if success_count > 0:
-        print(f"🏆 تم بنجاح إنتاج ونشر {success_count} أفلام شورتس سينمائية متطورة على قنواتك!")
+        print(f"🏆 تم بنجاح إنتاج ونشر الفيديوهات بنمط Matrix!")
     else:
         sys.exit(1)
