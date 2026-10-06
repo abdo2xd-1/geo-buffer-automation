@@ -39,6 +39,8 @@ if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
 
 def get_active_model():
+    if not GEMINI_KEY:
+        return None
     candidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
     for c in candidates:
         try:
@@ -48,22 +50,10 @@ def get_active_model():
             return m
         except Exception:
             continue
-    try:
-        for m_info in genai.list_models():
-            if "generateContent" in m_info.supported_generation_methods:
-                model_name = m_info.name.replace("models/", "")
-                try:
-                    m = genai.GenerativeModel(model_name)
-                    m.generate_content("test")
-                    return m
-                except Exception:
-                    continue
-    except Exception:
-        pass
-    return genai.GenerativeModel("gemini-3.8-flash")
+    return None
 
-model = get_active_model() if GEMINI_KEY else None
-VOICE_NAME = "ar-EG-ShakirNeural"  # صوت وثائقي بشري فخم
+model = get_active_model()
+VOICE_NAME = "ar-EG-ShakirNeural"  # صوت المعلق الوثائقي الإذاعي
 
 def clean_arabic_text(text: str) -> str:
     text = re.sub(r'[*#_`~>\[\]\(\)]', ' ', text)
@@ -79,7 +69,6 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
-# --- 2. إرسال إشعار فوري عبر تيليجرام (اختياري) ---
 def send_telegram_alert(message: str):
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
         try:
@@ -89,7 +78,7 @@ def send_telegram_alert(message: str):
         except Exception:
             pass
 
-# --- 3. ذاكرة السجل لمنع تكرار الأفكار نهائياً ---
+# --- 2. إدارة ذاكرة السجل لمنع التكرار ---
 HISTORY_FILE = "shorts_history.json"
 
 def load_history():
@@ -108,9 +97,39 @@ def save_history(history):
     except Exception:
         pass
 
-# --- 4. محرك التنقيح والتحكيم الذاتي للسيناريو الفيروسي ---
+# --- 3. محرك الذكاء الاصطناعي المقاوم للحظر الجغرافي ---
+def query_ai_robust(prompt: str) -> str:
+    # 1. Gemini
+    if model:
+        try:
+            res = model.generate_content(prompt)
+            if res and res.text:
+                return res.text.strip()
+        except Exception as e:
+            print(f"⚠️ تنبيه Gemini ({e})، جاري التحويل للمحرك البديل العالمي...")
+
+    # 2. محرك بديل عالمي مفتوح (بدون قيود جغرافية)
+    try:
+        url = "https://text.pollinations.ai/"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "messages": [
+                {"role": "system", "content": "أنت خبير صناعة محتوى يوتيوب شورتس باللغة العربية الفصحى."},
+                {"role": "user", "content": prompt}
+            ],
+            "model": "openai"
+        }
+        r = requests.post(url, json=payload, headers=headers, timeout=25)
+        if r.status_code == 200 and r.text:
+            return r.text.strip()
+    except Exception:
+        pass
+
+    return ""
+
+# --- 4. توليد المحتوى الفيروسي الذكي بنظام Infinite Loop ---
 def generate_apex_short(channel_name: str) -> dict:
-    print(f"🧠 [Apex Studio]: جاري توليد وتنقيح سيناريو فيروسي لقناة [{channel_name}]...")
+    print(f"🧠 [Apex Studio]: جاري هندسة فكرة وسيناريو شورتس لقناة [{channel_name}]...")
     history = load_history()
     recent_titles = [item.get("title", "") for item in history[-25:]]
     exclude_text = f"ممنوع تكرار هذه المواضيع نهائياً: {', '.join(recent_titles)}" if recent_titles else ""
@@ -136,43 +155,44 @@ def generate_apex_short(channel_name: str) -> dict:
         "scene_keywords": ["keyword 1", "keyword 2", "keyword 3", "keyword 4", "keyword 5"]
     }}
     """
-    try:
-        res1 = model.generate_content(prompt_stage1)
-        raw_json = res1.text.strip().replace("```json", "").replace("```", "")
-        data = json.loads(raw_json)
+    ai_raw = query_ai_robust(prompt_stage1)
+    if ai_raw:
+        try:
+            cleaned = ai_raw.replace("```json", "").replace("```", "").strip()
+            data = json.loads(cleaned)
+            
+            # محاولة تنقيح ثانية إن أمكن
+            prompt_refine = f"راجع هذا النص واجعله أكثر سرعة وإثارة مع الحفاظ على طوله (65-80 كلمة) وربط نهايته ببدايته: {data['script']}"
+            refined = query_ai_robust(prompt_refine)
+            if refined and len(refined.split()) >= 45:
+                data['script'] = refined
 
-        # فحص جودة النص وتحسين تدفقه
-        prompt_refine = f"""
-        أنت ناقد محتوى فيروسي متخصص في فحص الـ Retention.
-        راجع هذا السيناريو:
-        العنوان: {data['title']}
-        النص: {data['script']}
-        
-        عدّل النص ليصبح أكثر إحكاماً وجاذبية وحبساً للأنفاس، مع التأكد من أن:
-        1. الإيقاع سريع وخالٍ من أي حشو لغوي.
-        2. الجملة الأخيرة تندمج بسلاسة فائقة مع الجملة الأولى لتطبيق الـ Infinite Loop.
-        3. الطول يظل بين 65 و 80 كلمة.
-        
-        أخرج فقط النص المنقح النهائي المقروء دون أي مقدمات أو علامات إضافية.
-        """
-        res2 = model.generate_content(prompt_refine)
-        if res2.text and len(res2.text.split()) >= 45:
-            data['script'] = res2.text.strip()
-    except Exception:
-        fallback_pool = [
-            {
-                "title": "أغرب مكان محظور على وجه الأرض! 😱",
-                "script": "هذا هو المكان الوحيد على كوكبنا الذي يُمنع أي إنسان من دخوله تحت تهديد السلاح. في أعماق المحيط، تقف جزيرة معزولة لا يسكنها إلا أكثر الكائنات فتكاً في العالم. كل من حاول الاقتراب منها اختفى دون أثر، ولذلك سيبقى لغزها غامضاً لأن هذا هو المكان الوحيد...",
-                "scene_keywords": ["isolated island aerial", "military patrol ocean", "dark waves mystery", "restricted area forbidden", "ocean storm dark"]
-            },
-            {
-                "title": "أعظم سر دفن تحت أهرامات الجيزة! 🏛️",
-                "script": "هذا التجويف السري في قلب الهرم الأكبر حير كل أجهزة المسح بالأشعة الكونية. فراغ عملاق بحجم طائرة ركاب، مغلق بإحكام منذ آلاف السنين، ولم يجرؤ أحد على فتحه حتى الآن، خوفاً من كشف الحقيقة الصادمة عن هذا التجويف السري...",
-                "scene_keywords": ["pyramids giza 4k", "secret ancient chamber", "cosmic scan archaeology", "egypt desert golden", "ancient hieroglyphs"]
-            }
-        ]
-        data = random.choice(fallback_pool)
+            history.append({"title": data["title"], "time": time.time()})
+            save_history(history)
+            print(f"  💡 العنوان المعتمد لـ [{channel_name}]: {data['title']}")
+            return data
+        except Exception:
+            pass
 
+    # بنك الطوارئ الداخلي
+    fallback_pool = [
+        {
+            "title": "أغرب مكان محظور على وجه الأرض! 😱",
+            "script": "هذا هو المكان الوحيد على كوكبنا الذي يُمنع أي إنسان من دخوله تحت تهديد السلاح. في أعماق المحيط، تقف جزيرة معزولة لا يسكنها إلا أكثر الكائنات فتكاً في العالم. كل من حاول الاقتراب منها اختفى دون أثر، ولذلك سيبقى لغزها غامضاً لأن هذا هو المكان الوحيد...",
+            "scene_keywords": ["isolated island aerial", "military patrol ocean", "dark waves mystery", "restricted area forbidden", "ocean storm dark"]
+        },
+        {
+            "title": "أعظم سر دفن تحت أهرامات الجيزة! 🏛️",
+            "script": "هذا التجويف السري في قلب الهرم الأكبر حير كل أجهزة المسح بالأشعة الكونية. فراغ عملاق بحجم طائرة ركاب، مغلق بإحكام منذ آلاف السنين، ولم يجرؤ أحد على فتحه حتى الآن، خوفاً من كشف الحقيقة الصادمة عن هذا التجويف السري...",
+            "scene_keywords": ["pyramids giza 4k", "secret ancient chamber", "cosmic scan archaeology", "egypt desert golden", "ancient hieroglyphs"]
+        },
+        {
+            "title": "حفرة نهاية العالم: لغز أعماق سيبيريا! ❄️",
+            "script": "هذه الفوهة الغامضة التي ابتلعت الأرض فجأة في سيبيريا فجرت رعباً علمياً غير مسبوق. عمق سحيق ينبعث منه غاز مجهول وأصوات مرعبة سجلتها الحساسات الأرضية. ما زال الباحثون عاجزين عن تفسير بداية هذه الفوهة الغامضة...",
+            "scene_keywords": ["siberia tundra snow", "massive mysterious crater", "deep underground abyss", "dark mist winter", "extreme cold wilderness"]
+        }
+    ]
+    data = random.choice(fallback_pool)
     history.append({"title": data["title"], "time": time.time()})
     save_history(history)
     print(f"  💡 العنوان المعتمد لـ [{channel_name}]: {data['title']}")
