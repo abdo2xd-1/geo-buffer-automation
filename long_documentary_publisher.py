@@ -68,16 +68,14 @@ def get_audio_duration(file_path: str) -> float:
 
 # --- دالة الذكاء الاصطناعي المقاومة للحظر الجغرافي ---
 def query_ai_robust(prompt: str) -> str:
-    # المحاولة 1: Gemini
     if model:
         try:
             res = model.generate_content(prompt)
             if res and res.text:
                 return res.text.strip()
         except Exception as e:
-            print(f"⚠️️ تنبيه Gemini ({e})، جاري التحويل للمحرك البديل العالمي...")
+            print(f"⚠️ تنبيه Gemini ({e})، جاري التحويل للمحرك البديل العالمي...")
 
-    # المحاولة 2: محرك ذكاء اصطناعي بديل مفتوح وعالمي (بدون حظر جغرافي)
     try:
         url = "https://text.pollinations.ai/"
         headers = {"Content-Type": "application/json"}
@@ -158,7 +156,6 @@ def generate_titan_long_script(title: str) -> str:
             print(f"  ✅ تم إنجاز النص السردي ({len(cleaned.split())} كلمة)!")
             return cleaned
 
-    # محرك التوليد الموسوعي الداخلي (Offline Procedural Engine) لضمان 1600+ كلمة
     print("  ⚙️ تفعيل محرك التوليد الموسوعي الداخلي لضمان تخطي 11 دقيقة كاملة...")
     part1 = (
         f"في عمق التاريخ وأروقة الغموض الإنساني، يقف ملف {title} كأحد أعظم التحديات الفكرية والاستكشافية التي واجهت البشرية عبر العصور المتعاقبة. "
@@ -193,7 +190,7 @@ def generate_titan_long_script(title: str) -> str:
     full_block = f"{part1}\n\n{part2}\n\n{part3}\n\n{part4}\n\n{part5}"
     return f"{full_block}\n\n{full_block}\n\n{full_block}"
 
-# --- 4. توليد الصوت البشري المجزأ وضبط المدة الآمنة ---
+# --- 4. توليد الصوت البشري المجزأ ---
 async def generate_chunk_edge_tts(chunk_text: str, output_file: str):
     comm = edge_tts.Communicate(chunk_text, VOICE_NAME, rate="-4%")
     await comm.save(output_file)
@@ -241,7 +238,6 @@ def build_guaranteed_audio(title: str) -> float:
     duration = get_audio_duration("narration.mp3")
     print(f"🎧 مدة الصوت الحالية: {duration / 60:.2f} دقيقة ({duration:.0f} ثانية)")
 
-    # زيادة المدة بطريقة آمنة لا تتوقف أبداً
     while duration < MIN_DURATION_SECONDS:
         extra_prompt = f"اكتب فقرة وثائقية تكميلية مطولة (350 كلمة) باللغة العربية الفصحى تضيف تحليلاً عميقاً حول: {title}."
         extra_text = query_ai_robust(extra_prompt)
@@ -313,31 +309,31 @@ def prepare_video_footage(keywords: list, target_duration: float, output_dir: st
             
     return playlist_path
 
-# --- 6. رندر الفيلم الوثائقي السينمائي الكامل ---
+# --- 6. رندر سينمائي فائق السرعة والمضبوط بالثانية بدقة ---
 def render_titan_documentary(playlist_path: str, audio_path: str, channel_name: str, output_path: str = "final_documentary.mp4"):
-    print("🎨 جاري تطبيق المونتاج السينمائي (Grading + 35mm Grain + Branding)...")
     doc_dur = get_audio_duration(audio_path)
+    print(f"🎨 جاري المونتاج السينمائي فائق السرعة المضبوط على {doc_dur / 60:.2f} دقيقة...")
     
     bgm_cmd = [
         "ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=52:sample_rate=44100",
-        "-t", str(doc_dur + 5), "-af", "lowpass=f=220,volume=0.08", "long_bgm.mp3"
+        "-t", str(doc_dur + 2), "-af", "lowpass=f=220,volume=0.08", "long_bgm.mp3"
     ]
     subprocess.run(bgm_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     audio_chain = (
         "[1:a]highpass=f=70,equalizer=f=120:width_type=o:width=1.6:g=4.0,"
         "equalizer=f=3500:width_type=o:width=1.4:g=2.5,loudnorm=I=-14:TP=-1.5:LRA=7[voice];"
-        "[2:a]volume=0.09[bgm];"
+        "[2:a]volume=0.08[bgm];"
         "[voice][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]"
     )
 
     clean_tag = clean_arabic_text(channel_name.split('|')[0].strip())
 
+    # تلوين وتظليل سينمائي سريع وخفيف بدون فلاتر ثقيلة تعطل المعالج
     video_chain = (
         "[0:v]fps=25,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,"
-        "eq=contrast=1.15:saturation=1.23:brightness=-0.01,vignette=angle=0.42,"
-        "noise=alls=10:allf=t+u,"
-        f"drawtext=text='{clean_tag}':fontcolor=white@0.3:fontsize=40:x=60:y=60:box=1:boxcolor=black@0.2:boxborderw=10,"
+        "eq=contrast=1.14:saturation=1.22:brightness=-0.01,vignette=angle=0.40,"
+        f"drawtext=text='{clean_tag}':fontcolor=white@0.3:fontsize=38:x=60:y=60:box=1:boxcolor=black@0.2:boxborderw=10,"
         "format=yuv420p[vout]"
     )
 
@@ -347,17 +343,19 @@ def render_titan_documentary(playlist_path: str, audio_path: str, channel_name: 
         "-f", "concat", "-safe", "0", "-i", playlist_path,
         "-i", audio_path,
         "-i", "long_bgm.mp3",
+        "-t", str(doc_dur),                         # إيقاف الرندر فور انتهاء الصوت بدقة
         "-filter_complex", f"{video_chain};{audio_chain}",
         "-map", "[vout]",
         "-map", "[aout]",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "27",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
         "-c:a", "aac", "-b:a", "192k",
+        "-threads", "0",                            # استغلال كافة قدرات المعالج
         "-max_muxing_queue_size", "1024",
-        "-shortest",
         output_path
     ]
     subprocess.run(cmd, check=True)
-    print(f"🏆 اكتمل إنتاج الفيلم الوثائقي السينمائي: {output_path}")
+    size_mb = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"🏆 اكتمل إنتاج الفيلم الوثائقي بنجاح: {output_path} ({size_mb:.1f} ميجابايت)")
 
 # --- 7. توليد صورة مصغرة نارية تلقائياً (Auto High-CTR Thumbnail) ---
 def create_auto_thumbnail(video_path: str, thumb_text: str, output_thumb: str = "custom_thumb.jpg") -> str:
@@ -441,7 +439,7 @@ def upload_to_youtube(file_path: str, channel_key: str, meta: dict, total_durati
     try:
         thumb_path = create_auto_thumbnail(file_path, meta.get("thumb_text", "وثائقي خاص"))
         youtube.thumbnails().set(videoId=video_id, media_body=MediaFileUpload(thumb_path)).execute()
-        print(f"  🖼️️ تم رفع الصورة المصغرة المخصصة (Custom Thumbnail) بنجاح!")
+        print(f"  🖼️ تم رفع الصورة المصغرة المخصصة (Custom Thumbnail) بنجاح!")
     except Exception as e:
         print(f"  ⚠️ ملاحظة الصورة المصغرة: {e}")
 
