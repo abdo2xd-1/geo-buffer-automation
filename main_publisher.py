@@ -103,57 +103,42 @@ CATEGORIES = [
     "ألغاز الثروات والكنوز المفقودة التي اختفى كل من بحث عنها"
 ]
 
-# بنك طوارئ مستقل تماماً لكل قناة (مستحيل قناة تأخذ فكرة الأخرى)
+# بنك طوارئ احترافي ومطول (95 إلى 100 كلمة = 38 إلى 45 ثانية بالتمام والكمال)
 FALLBACK_BANKS = {
     "MASAR": [
         {
-            "title": "مخطوطة فوينيتش: النص الذي عجزت عنه البشرية! 📜",
-            "script": "هذا الكتاب الغامض حير أعظم علماء التشفير وأجهزة الاستخبارات لعقود طويلة. كُتب بلغة مجهولة ورسومات لنباتات لا وجود لها على كوكبنا، ولم يستطع أي حاسوب فك رموزه حتى اليوم، ليبقى السؤال قائماً: من كتب هذا الكتاب الغامض...",
-            "scene_keywords": ["ancient manuscript vintage", "mysterious book pages", "cryptography symbols", "ancient library dark", "medieval history"]
-        },
-        {
             "title": "جيش التراكوتا: لغز الإمبراطور الأول! ⚔️",
-            "script": "آلاف الجنود المصنوعين من الطين يقفون تحت الأرض لحراسة قبر إمبراطور الصين الأول. المفاجأة أن ملامح كل جندي تختلف تماماً عن الآخر، ولا يزال القبر الرئيسي مغلقاً حتى اليوم خوفاً من أنهار الزئبق السامة التي تحيط بجيش التراكوتا...",
-            "scene_keywords": ["terracotta army china", "ancient tomb underground", "emperor mausoleum", "chinese history archaeology", "dark ancient chamber"]
+            "script": "في أعماق مقاطعة شنشي الصينية، يقف جيش كامل منحوت من الطين بحجم بشري طبيعي تحت الأرض منذ أكثر من ألفي عام. أكثر من ثمانية آلاف جندي وضابط وخيل وعربة حربية شيدت لحراسة ضريح إمبراطور الصين الأول في العالم الآخر. المفاجأة الصادمة التي أذهلت علماء الآثار هي أن كل جندي له ملامح وجه وبصمة مختلفة تماماً عن الآخر وكأنهم أناس حقيقيون تحولوا إلى حجارة. حتى اليوم ترفض الحكومة الصينية فتح القبر الرئيسي للإمبراطور، ليس فقط بسبب أسراره المرعبة، بل بسبب تحذيرات الوثائق التاريخية من وجود أنهار حقيقية من الزئبق السام والكمائن القاتلة التي تحمي أسرار هذا الجيش الأسطوري...",
+            "scene_keywords": ["ancient warrior statues", "chinese temple drone", "archaeology excavation underground", "ancient stone soldiers", "ancient artifacts gold"]
         },
         {
-            "title": "مدينة البتراء: اللغز المنحوت في الصخر! 🏛️",
-            "script": "مدينة كاملة نُحتت بدقة إعجازية في قلب الجبال الوردية، دون استخدام أي معدات حديثة. الأنباط شيدوا نظام مياه سري جعلها واحة وسط الصحراء القاحلة، قبل أن يختفوا فجأة دون أن يتركوا أي وثيقة تشرح سر مدينة البتراء...",
-            "scene_keywords": ["petra jordan ancient", "rock carved temple", "desert canyon aerial", "ancient civilization architecture", "middle east history"]
+            "title": "مخطوطة فوينيتش: النص الذي عجزت عنه البشرية! 📜",
+            "script": "في خزانة الكتب النادرة بجامعة ييل، ترقد أغرب وثيقة في تاريخ البشرية، كُتبت في القرن الخامس عشر بحروف ونقوش لم ترد في أي لغة معروفة على وجه الأرض. صفحات المخطوطة مليئة بمئات الرسومات الملونة لنباتات غريبة لا وجود لها في علم النبات، وخرائط فلكية لكوكبات مجهولة وأشكال هندسية معقدة. كبار خبراء التشفير العسكري وعلماء اللسانيات وحتى أحدث حواسيب الذكاء الاصطناعي فشلوا تماماً في فك سطر واحد منها. هل هي رسالة من حضارة منسية أم شيفرة سرية لا مثيل لها؟ لا أحد يعلم حتى اليوم من كتب هذه المخطوطة الغامضة...",
+            "scene_keywords": ["ancient mysterious book", "vintage old manuscript", "cryptography parchment pages", "candlelight ancient library", "ancient medieval scroll"]
         }
     ],
     "MASHAREE": [
         {
-            "title": "مدينة ديرينكويو: أعظم لغز تحت الأرض! 🕳️",
-            "script": "مدينة عملاقة تحت الأرض بعمق ثمانية عشر طابقاً كانت تتسع لعشرين ألف إنسان مع ماشيتهم ومؤنهم. بنيت بفتحات تهوية إعجازية وأبواب حجرية لا تفتح إلا من الداخل، ولا أحد يعرف بدقة من بدأ بحفر هذه المدينة العملاقة...",
-            "scene_keywords": ["derinkuyu underground city", "ancient stone tunnels", "deep cavern darkness", "subterranean complex", "cappadocia underground"]
-        },
-        {
-            "title": "مشروع كولا العملاق: أعمق حفرة على الأرض! 🌋",
-            "script": "أعمق حفرة حفرها البشر في التاريخ وصلت إلى عمق اثني عشر كيلومتراً في القشرة الأرضية. العلماء سجلوا درجات حرارة خيالية وغازات غير مسبوقة قبل أن تتوقف أعمال الحفر فجأة بسبب أصوات مريبة سُجلت في أعمق حفرة...",
-            "scene_keywords": ["deep drilling rig arctic", "drilling core hole", "dark abyss underground", "scientific industrial machine", "extreme geology"]
-        },
-        {
             "title": "سد الممرات الثلاثة: المشروع الذي أبطأ دوران الأرض! ⚡",
-            "script": "أضخم سد كهرومائي عرفته البشرية يحجز وراءه مليارات الأطنان من المياه. العلماء أكدوا أن وزنه الهائل أدى إلى إبطاء دوران كوكب الأرض بجزء من الثانية، مما يجعله المشروع الأكثر تأثيراً على الجغرافيا في تاريخ هذا السد...",
-            "scene_keywords": ["three gorges dam aerial", "massive hydro dam water", "megastructure engineering", "river flooding powerful", "industrial aerial view"]
+            "script": "في قلب الصين يقف سد الممرات الثلاثة كأضخم محطة لتوليد الطاقة الكهرومائية وأثقل هيكل خرساني شيده البشر في التاريخ. هذا المشروع العملاق يحجز وراءه أكثر من أربعين مليار متر مكعب من المياه بارتفاع يعادل ناطحة سحاب عملاقة. العلماء في وكالة ناسا وثقوا حقيقة علمية لا تصدق: هذا الثقل المائي الهائل عند ملء الخزان أدى إلى إزاحة محور كتلة الأرض بمقدار سنتيمترين، وتسبب في إبطاء دوران كوكب الأرض بمقدار جزء من المليون من الثانية. إنه ليس مجرد مشروع لتوليد الكهرباء والتحكم في الفيضانات، بل هو المعجزة الهندسية الوحيدة التي استطاعت حرفياً تغيير حركة كوكبنا...",
+            "scene_keywords": ["massive concrete dam", "hydroelectric dam water", "giant water reservoir aerial", "powerful river flooding", "water turbine power"]
+        },
+        {
+            "title": "مدينة ديرينكويو: أعظم لغز تحت الأرض! 🕳️",
+            "script": "تحت سهول كبادوكيا الصخرية، حفر القدماء أعظم إنجاز هندسي تحت الأرض بعمق ثمانية عشر طابقاً يخترق باطن الأرض لمسافة خمسة وثمانين متراً. هذه المدينة السفلية الكاملة شُيدت لتتسع لأكثر من عشرين ألف إنسان، مزودة بقنوات تهوية عبقرية تصل للهواء النقي، وآبار مياه مستقلة، ومخازن ضخمة للحبوب، وأبواب حجرية دائرية تزن أطناناً ولا تفتح إلا من الداخل للحماية من الغزاة. كيف استطاع بشر قبل آلاف السنين حفر ملايين الأطنان من الصخور في الظلام الدامس دون انهيار سقف واحد؟ هذا هو اللغز الأعظم في مدينة ديرينكويو...",
+            "scene_keywords": ["dark underground tunnel", "ancient cave subterranean", "mysterious stone passage", "cappadocia underground", "ancient bunker ruins"]
         }
     ],
     "ABAAD": [
         {
-            "title": "خندق ماريانا: أعمق نقطة على كوكب الأرض! 🌊",
-            "script": "في هذا العمق السحيق الذي يتجاوز أحد عشر كيلومتراً، يعادل الضغط وزن آلاف الأطنان على الإنش الواحد. في هذا الظلام الدامس اكتشف العلماء كائنات شفافة تعيش في ظروف مستحيلة لم يتخيل العلم وجودها في هذا العمق السحيق...",
-            "scene_keywords": ["mariana trench deep ocean", "abyssal sea creature", "dark underwater pressure", "submarine explore trench", "ocean darkness depth"]
+            "title": "شلالات الدم في القارة القطبية! 🩸",
+            "script": "وسط جليد القارة القطبية الجنوبية المتجمد، تتدفق ظاهرة جيولوجية استثنائية تعرف باسم شلالات الدم بلون أحمر قاني يصب فوق صفائح الجليد الأبيض الناصع. لأكثر من قرن كامل، اعتقد المستكشفون أن طحالب حمراء غريبة هي سبب هذا اللون الصادم، لكن الحقيقة كانت أعقد وأغرب بكثير. الأبحاث الحديثة كشفت عن وجود بحيرة تحتية محبوسة تحت طبقات جليد سمكها أربعمائة متر، معزولة تماماً عن الغلاف الجوي وبلا ضوء ولا أكسجين منذ مليوني عام. هذه المياه شديدة الملوحة وغنية بالحديد الذي يتأكسد فور ملامسته للهواء ليتحول إلى شلال بلون الدم، محتفظاً بأسرار بيئة كوكبية تشبه الحياة على المريخ...",
+            "scene_keywords": ["red water flowing", "waterfall slow motion", "glacier ice antarctica", "frozen waterfall winter", "arctic aerial landscape"]
         },
         {
             "title": "عين الصحراء: اللغز الجيولوجي الفضائي! 👁️",
-            "script": "تكوين جيولوجي دائري عملاق في صحراء موريتانيا يبلغ قطره أربعين كيلومتراً ولا يظهر بوضوح إلا من الفضاء. دوائر متحدة المركز حيرت العلماء في تفسير سبب تشكلها، ليبقى السؤال: هل هو نيزك أم بركان أم بقايا حضارة عين الصحراء...",
-            "scene_keywords": ["richat structure mauritania", "eye of the sahara space", "desert anomaly aerial", "circular geological crater", "sahara golden dunes"]
-        },
-        {
-            "title": "شلالات الدم في القارة القطبية! 🩸",
-            "script": "وسط صقيع أنتاركتيكا المتجمد، يتدفق شلال لونه أحمر قاني كالدماء على صفائح الجليد الأبيض. اللغز كشف عن بحيرة محبوسة تحت الجليد منذ مليوني عام تعيش فيها بكتيريا بلا ضوء ولا أكسجين، وهي مصدر هذه الشلالات...",
-            "scene_keywords": ["blood falls antarctica", "red waterfall glacier", "frozen wilderness ice", "antarctic aerial landscape", "extreme cold nature"]
+            "script": "في قلب الصحراء الموريتانية الكبرى، يقف تكوين جيولوجي دائري عملاق يُعرف باسم قلب الريشات أو عين الصحراء، ويمتد بقطر يصل إلى أربعين كيلومتراً بحيث لا يمكن رؤية ملامحه الكاملة إلا من مدار الفضاء الخارجي. هذا التكوين يتألف من دوائر صخرية متحدة المركز ترتفع بشكل متناسق ومتقن أثار حيرة الجيولوجيين لعقود طويلة. هل تشكلت نتيجة اصطدام نيزك كوني بالأرض، أم ثوران بركاني قديم، أم أنها بقايا مدينة أطلانتس الأسطورية الدائرية المفقودة التي وصفها أفلاطون؟ حتى اليوم لا تزال الرمال تخفي الحقيقة الكاملة حول عين الصحراء...",
+            "scene_keywords": ["sahara desert drone aerial", "giant crater desert", "golden sand dunes aerial", "mysterious geological rocks", "desert storm dust"]
         }
     ]
 }
@@ -173,7 +158,7 @@ def query_ai_robust(prompt: str) -> str:
         headers = {"Content-Type": "application/json"}
         payload = {
             "messages": [
-                {"role": "system", "content": "أنت خبير صناعة محتوى يوتيوب شورتس باللغة العربية الفصحى."},
+                {"role": "system", "content": "أنت كاتب سيناريو يوتيوب شورتس وثائقي عالمي فخم باللغة العربية الفصحى."},
                 {"role": "user", "content": prompt}
             ],
             "model": "openai"
@@ -186,40 +171,33 @@ def query_ai_robust(prompt: str) -> str:
 
     return ""
 
-# --- 4. توليد المحتوى الحصري بنظام التوزيع الرياضي ---
+# --- 4. توليد المحتوى الحصري الطويل (38 إلى 45 ثانية) ---
 def generate_apex_short(channel_key: str, channel_name: str) -> dict:
     day_of_year = datetime.datetime.now().timetuple().tm_yday
     ch_info = CHANNELS_MAP.get(channel_key.upper(), {"index": 0})
     ch_idx = ch_info.get("index", 0)
     
-    # ضمان تصنيف مختلف ومستقل 100% لكل قناة على مدار العام
     cat_idx = (day_of_year * 4 + ch_idx) % len(CATEGORIES)
     assigned_category = CATEGORIES[cat_idx]
 
-    print(f"🧠 [Apex Studio]: جاري هندسة فكرة وسيناريو حصري لقناة [{channel_name}] في مجال [{assigned_category}]...")
+    print(f"🧠 [Apex Studio]: جاري هندسة فكرة وسيناريو شورتس مطول (40 ثانية) لقناة [{channel_name}] في مجال [{assigned_category}]...")
 
     prompt_stage1 = f"""
-    أنت العقل المدبر لأكبر قنوات الوثائقيات الفيروسية العالمية (YouTube Shorts).
-    قناتنا الحالية هي: "{channel_name}".
-    المجال الحصري المخصص لهذه القناة اليوم هو: "{assigned_category}".
+    أنت كبير كتاب الوثائقيات القصيرة لـ YouTube Shorts لقناة: "{channel_name}".
+    التصنيف الحصري المخصص لليوم هو: "{assigned_category}".
     
-    قاعدة ذهبية لمنع التكرار:
-    - يجب أن تكون الفكرة حصرية تماماً لقناة {channel_name} وفي نطاق ({assigned_category}).
-    - ممنوع منعاً باتاً تكرار الأفكار المستهلكة أو الشائعة (مثل: أهرامات الجيزة، مثلث برمودا، حفرة سيبيريا، بئر برهوت، جزيرة سينتينل، سور الصين).
-    - ركّز على قصة غامضة أو واقعة غير متوقعة لم يسمع بها أغلب المشاهدين.
-    
-    شروط السرد الفيروسي (Infinite Loop):
-    1. Hook الصدمة (أول ثانيتين): جملة تجعل المشاهد يتوقف فوراً عن التمرير.
-    2. الحبكة: سرد سريع لمعلومات تاريخية أو علمية موثقة ومثيرة للذهول.
-    3. The Infinite Loop: اربط الكلمة الأخيرة في السيناريو ببداية الجملة الأولى ليكتمل المعنى ويعيد الفيديو تشغيل نفسه بلا نهاية.
-    4. الطول: من 65 إلى 80 كلمة فقط (ليكون زمن الصوت بين 30 إلى 40 ثانية).
-    5. حدد 5 عبارات بحث بصرية سينمائية بالإنجليزية تناسب مقاطع Pexels.
+    شروط الطول والسرد الإلزامية:
+    1. الطول الذهبي: اكتب نصاً مشوقاً ومفصلاً يتراوح بدقة بين 90 إلى 110 كلمات (ممنوع كتابة نص قصير أقل من 85 كلمة نهائياً حتى تصل مدة الصوت إلى 40 ثانية).
+    2. Hook الصدمة (أول 3 ثوانٍ): جملة افتتاحية تخطف المشاهد وتمنعه من التمرير.
+    3. صلب القصة: حقائق مذهلة، تفاصيل وأرقام تاريخية أو علمية دقيقة.
+    4. The Infinite Loop: اربط الكلمة الأخيرة بنهاية النص ببداية أول جملة ليكتمل المعنى ويعيد الفيديو تشغيل نفسه بلا نهاية.
+    5. حدد 5 كلمات بحث بصرية سينمائية غنية بالإنجليزية تناسب محرك Pexels.
     
     أخرج الرد بصيغة JSON حصراً:
     {{
         "title": "عنوان مثير مع إيموجي",
         "script": "النص المنطوق فقط بدون أي توجيهات",
-        "scene_keywords": ["keyword 1", "keyword 2", "keyword 3", "keyword 4", "keyword 5"]
+        "scene_keywords": ["visual query 1", "visual query 2", "visual query 3", "visual query 4", "visual query 5"]
     }}
     """
     ai_raw = query_ai_robust(prompt_stage1)
@@ -227,15 +205,15 @@ def generate_apex_short(channel_key: str, channel_name: str) -> dict:
         try:
             cleaned = ai_raw.replace("```json", "").replace("```", "").strip()
             data = json.loads(cleaned)
-            print(f"  💡 العنوان المعتمد لـ [{channel_name}]: {data['title']}")
-            return data
+            if len(data.get("script", "").split()) >= 75:
+                print(f"  💡 العنوان المعتمد: {data['title']} ({len(data['script'].split())} كلمة)")
+                return data
         except Exception:
             pass
 
-    # بنك الطوارئ الحصري لكل قناة (لا يوجد أي تكرار بين القنوات)
     bank = FALLBACK_BANKS.get(channel_key.upper(), FALLBACK_BANKS["MASAR"])
     data = random.choice(bank)
-    print(f"  💡 العنوان المعتمد من البنك الحصري لـ [{channel_name}]: {data['title']}")
+    print(f"  💡 العنوان المعتمد من البنك الحصري: {data['title']} ({len(data['script'].split())} كلمة)")
     return data
 
 # --- 5. توليد الصوت البشري الفخم ---
@@ -244,7 +222,7 @@ async def generate_short_voice_async(text: str, output_path: str):
     await comm.save(output_path)
 
 def create_short_audio(script_text: str, output_path: str) -> float:
-    print(f"🎙️ جاري توليد التعليق الصوتي الوثائقي الإذاعي ({VOICE_NAME})...")
+    print(f"🎙️️ جاري توليد التعليق الصوتي الوثائقي الإذاعي ({VOICE_NAME})...")
     cleaned = clean_arabic_text(script_text)
     try:
         asyncio.run(generate_short_voice_async(cleaned, output_path))
@@ -252,12 +230,12 @@ def create_short_audio(script_text: str, output_path: str) -> float:
         gtts.gTTS(text=cleaned, lang="ar").save(output_path)
         
     dur = get_audio_duration(output_path)
-    print(f"🎧 مدة الصوت: {dur:.1f} ثانية")
+    print(f"🎧 مدة الصوت المعتمدة: {dur:.1f} ثانية")
     return dur
 
-# --- 6. تنزيل ومعالجة المقاطع لمنع الشاشة السوداء نهائياً ---
+# --- 6. تنزيل المشاهد وتوسيطها وقصها بملء الشاشة 100% بدون أي سواد ---
 def download_vertical_clips(keywords: list, target_duration: float, output_dir: str) -> str:
-    print(f"📱 جاري جلب وتوحيد اللقطات السينمائية لمنع أي شاشة سوداء بين المقاطع...")
+    print(f"📱 جاري جلب لقطات سينمائية عالية الدقة وتوسيطها لملء الشاشة بدون أي حواف سوداء...")
     os.makedirs(output_dir, exist_ok=True)
     headers = {"Authorization": PEXELS_KEY}
     
@@ -266,34 +244,35 @@ def download_vertical_clips(keywords: list, target_duration: float, output_dir: 
     total_footage_sec = 0.0
     
     for kw in keywords:
-        if total_footage_sec >= target_duration + 10:
+        if total_footage_sec >= target_duration + 12:
             break
-        url = f"https://api.pexels.com/videos/search?query={kw}&per_page=6&orientation=portrait"
+        # البحث بدون حصر portrait لجلب أروع لقطات الـ 4K والـ Drone وتكبيرها سينمائياً
+        url = f"https://api.pexels.com/videos/search?query={kw}&per_page=6"
         try:
             res = requests.get(url, headers=headers, timeout=20).json()
             for v in res.get("videos", []):
-                if total_footage_sec >= target_duration + 10:
+                if total_footage_sec >= target_duration + 12:
                     break
                 files = v.get("video_files", [])
-                chosen = next((f for f in files if f.get("height", 0) > f.get("width", 0)), None) or (files[0] if files else None)
-                if not chosen:
+                if not files:
                     continue
+                # اختيار أفضل جودة متاحة (HD أو 4K)
+                chosen = next((f for f in files if f.get("width") == 1920), None) or files[0]
                     
                 raw_path = os.path.join(output_dir, f"raw_{clip_counter:02d}.mp4")
                 norm_path = os.path.join(output_dir, f"norm_{clip_counter:02d}.mp4")
                 
-                # تحميل الملف الأصلي
                 r = requests.get(chosen.get("link"), stream=True, timeout=30)
                 with open(raw_path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=1024*1024):
                         f.write(chunk)
                 
-                # توحيد الكليب: تجريد الصوت + توحيد المقاس 1080x1920 + 30fps
+                # توسيط وقص وتكبير الفيديو لملء أبعاد 1080x1920 بالكامل مع تجريد الصوت الداخلي
                 conv_cmd = [
                     "ffmpeg", "-y", "-i", raw_path,
                     "-an",
-                    "-vf", "fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,format=yuv420p",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
+                    "-vf", "fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,setsar=1,format=yuv420p",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
                     norm_path
                 ]
                 subprocess.run(conv_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -374,9 +353,9 @@ def generate_apex_soundtrack(duration: float, output_path: str = "soundtrack.mp3
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return output_path
 
-# --- 9. رندر سينمائي بحبيبات الفيلم (Noise) وشريط التقدم ---
+# --- 9. رندر سينمائي بحبيبات الفيلم 35mm وشريط التقدم ---
 def render_apex_short(playlist_path: str, voice_path: str, script_text: str, channel_name: str, output_path: str):
-    print("🎬 [Render]: جاري تطبيق المونتاج السينمائي بحبيبات الفيلم 35mm والانتقالات السلسة...")
+    print("🎬 [Render]: جاري تطبيق المونتاج السينمائي الشامل بحبيبات الفيلم 35mm والتوسيط الكامل...")
     voice_dur = get_audio_duration(voice_path)
     sfx_path = generate_apex_soundtrack(voice_dur, "sfx.mp3")
     ass_path = generate_karaoke_ass(script_text, voice_dur, "subs.ass")
@@ -390,7 +369,6 @@ def render_apex_short(playlist_path: str, voice_path: str, script_text: str, cha
 
     clean_channel_tag = clean_arabic_text(channel_name.split('|')[0].strip())
 
-    # تلوين + تظليل + حبيبات فيلم (Noise) + شعار مائي + ترجمة + شريط تقدم
     video_chain = (
         "[0:v]eq=contrast=1.16:saturation=1.24:brightness=-0.01,vignette=angle=0.45,"
         "noise=alls=10:allf=t+u,"
