@@ -37,6 +37,7 @@ if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
 
 def get_active_model():
+    """اختيار نموذج الذكاء الاصطناعي النشط تلقائياً"""
     candidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
     for c in candidates:
         try:
@@ -64,12 +65,14 @@ model = get_active_model() if GEMINI_KEY else None
 VOICE_NAME = "ar-EG-ShakirNeural"  # صوت بشري وثائقي طبيعي
 
 def clean_arabic_text(text: str) -> str:
+    """تنظيف النص من الرموز والماركداون لضمان نطق سليم"""
     text = re.sub(r'[*#_`~>\[\]\(\)]', ' ', text)
     text = text.replace('"', ' ').replace("'", ' ')
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 def get_audio_duration(file_path: str) -> float:
+    """قياس مدة الصوت بدقة عبر ffprobe"""
     try:
         cmd = f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{file_path}"'
         res = subprocess.check_output(cmd, shell=True).decode().strip()
@@ -77,7 +80,7 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
-# --- 2. توليد فكرة شورتس وسيناريو سريع (30 إلى 45 ثانية كحد أقصى) ---
+# --- 2. توليد فكرة وسيناريو الشورتس (30 إلى 45 ثانية كحد أقصى) ---
 def generate_short_idea_and_script() -> dict:
     print("🎲 جاري ابتكار فكرة شورتس فيروسية وسيناريو مشوق عبر Gemini...")
     prompt = """
@@ -113,7 +116,7 @@ def generate_short_idea_and_script() -> dict:
                 "search_keywords": ["ancient pyramids egypt", "archaeology mystery", "golden desert aerial"]
             },
             {
-                "title": "حفرة نهاية العالم: لغز أعماق سيبيريا! ❄️️",
+                "title": "حفرة نهاية العالم: لغز أعماق سيبيريا! ❄️",
                 "script": "في أقصى صقيع سيبيريا، ظهرت فجأة فوهة عملاقة تبتلع الأرض بعمق مئات الأمتار! العلماء سجلوا أصواتاً مريبة تصدر من باطنها وغازات غريبة تنبعث بلا توقف. هل هي بداية كارثة بيئية أم لغز لم يُفسر؟",
                 "search_keywords": ["mysterious crater aerial", "siberia ice wilderness", "deep cave darkness"]
             }
@@ -123,7 +126,7 @@ def generate_short_idea_and_script() -> dict:
     print(f"  💡 عنوان الشورتس: {data['title']}")
     return data
 
-# --- 3. توليد الصوت البشري للشورتس ---
+# --- 3. توليد صوت الشورتس ---
 async def generate_short_voice_async(text: str, output_path: str):
     comm = edge_tts.Communicate(text, VOICE_NAME, rate="-2%")
     await comm.save(output_path)
@@ -140,7 +143,7 @@ def create_short_audio(script_text: str, output_path: str = "short_narration.mp3
     print(f"🎧 مدة التعليق الصوتي للشورتس: {dur:.1f} ثانية")
     return dur
 
-# --- 4. جلب مقاطع فيديو عمودية (9:16 Portrait) من Pexels ---
+# --- 4. جلب المشاهد الرأسية (9:16) من Pexels ---
 def download_vertical_clips(keywords: list, target_duration: float, output_dir: str = "short_clips") -> str:
     print(f"📱 جاري تنزيل مشاهد عمودية (Shorts 9:16) لتغطية {target_duration:.1f} ثانية...")
     os.makedirs(output_dir, exist_ok=True)
@@ -187,7 +190,7 @@ def download_vertical_clips(keywords: list, target_duration: float, output_dir: 
             
     return playlist_path
 
-# --- 5. رندر الشورتس بمقاس 1080x1920 وبحجم ملف خفيف ومضغوط ---
+# --- 5. رندر الشورتس العمودي السريع ---
 def render_short_video(playlist_path: str, audio_path: str, output_path: str = "final_short.mp4"):
     print("⚙️ جاري دمج ومونتاج الشورتس العمودي (1080x1920)...")
     cmd = [
@@ -207,23 +210,12 @@ def render_short_video(playlist_path: str, audio_path: str, output_path: str = "
     size_mb = os.path.getsize(output_path) / (1024 * 1024)
     print(f"🎬 اكتمل إنتاج الشورتس بنجاح: {output_path} (حجم الملف: {size_mb:.1f} ميجابايت)")
 
-# --- 6. رفع الفيديو برابط مباشر ومضمون لبافر مع 4 سيرفرات بديلة ---
+# --- 6. استخراج رابط مباشر للمقطع ---
 def get_public_video_url(file_path: str) -> str:
     size_mb = os.path.getsize(file_path) / (1024 * 1024)
     print(f"🌐 جاري رفع الفيديو بحجم {size_mb:.1f} ميجابايت للحصول على رابط مباشر لـ Buffer...")
     
-    # 1. التجربة عبر 0x0.st
-    try:
-        with open(file_path, "rb") as f:
-            res = requests.post("https://0x0.st", files={"file": f}, timeout=60)
-        if res.status_code == 200 and res.text.strip().startswith("http"):
-            url = res.text.strip()
-            print(f"  🔗 تم الرفع بنجاح عبر 0x0.st: {url}")
-            return url
-    except Exception as e:
-        print(f"⚠️ 0x0.st: {e}")
-
-    # 2. التجربة عبر temp.sh
+    # 1. temp.sh
     try:
         with open(file_path, "rb") as f:
             res = requests.post("https://temp.sh/upload", files={"file": f}, timeout=60)
@@ -234,83 +226,94 @@ def get_public_video_url(file_path: str) -> str:
     except Exception as e:
         print(f"⚠️ temp.sh: {e}")
 
-    # 3. التجربة عبر Litterbox
+    # 2. 0x0.st
     try:
         with open(file_path, "rb") as f:
-            res = requests.post(
-                "https://litterbox.catbox.moe/resources/internals/api.php",
-                data={"reqtype": "fileupload", "time": "24h"},
-                files={"fileToUpload": f},
-                timeout=60
-            )
+            res = requests.post("https://0x0.st", files={"file": f}, timeout=60)
         if res.status_code == 200 and res.text.strip().startswith("http"):
             url = res.text.strip()
-            print(f"  🔗 تم الرفع بنجاح عبر Litterbox: {url}")
+            print(f"  🔗 تم الرفع بنجاح عبر 0x0.st: {url}")
             return url
     except Exception as e:
-        print(f"⚠️ Litterbox: {e}")
-
-    # 4. التجربة عبر transfer.sh
-    try:
-        fname = os.path.basename(file_path)
-        with open(file_path, "rb") as f:
-            res = requests.put(f"https://transfer.sh/{fname}", data=f, timeout=60)
-        if res.status_code == 200 and res.text.strip().startswith("http"):
-            url = res.text.strip()
-            print(f"  🔗 تم الرفع بنجاح عبر transfer.sh: {url}")
-            return url
-    except Exception as e:
-        print(f"⚠️ transfer.sh: {e}")
+        print(f"⚠️ 0x0.st: {e}")
 
     return ""
 
-# --- 7. النشر عبر Buffer API ---
-def publish_to_buffer(video_url: str, title: str):
-    print("🚀 جاري الاتصال بـ Buffer وجدولة/نشر الشورتس...")
+# --- 7. الاتصال والنشر على جميع القنوات الثلاث في Buffer ---
+def publish_to_all_buffer_channels(video_url: str, title: str):
+    print("🚀 جاري الاتصال بـ Buffer لتجهيز النشر على القنوات الثلاث...")
     
     if not BUFFER_TOKEN:
         print("❌ خطأ: متغير BUFFER_ACCESS_TOKEN غير موجود في إعدادات Secrets!")
         sys.exit(1)
 
-    profile_id = BUFFER_PROFILE_ID
-    if not profile_id:
-        try:
-            prof_res = requests.get(f"https://api.bufferapp.com/1/profiles.json?access_token={BUFFER_TOKEN}", timeout=20).json()
-            if isinstance(prof_res, list) and len(prof_res) > 0:
-                # اختيار أول حساب قناة يوتيوب متاح
-                yt_prof = next((p for p in prof_res if p.get("service") in ["youtube", "tiktok", "instagram"]), prof_res[0])
-                profile_id = yt_prof.get("id")
-                print(f"  🎯 تم اختيار حساب Buffer تلقائياً: [{yt_prof.get('formatted_username')} - {yt_prof.get('service')}] (ID: {profile_id})")
-        except Exception as e:
-            print(f"⚠️ تعذر جلب قائمة Profiles من بافر تلقائياً: {e}")
+    target_profiles = []
 
-    if not profile_id:
-        print("❌ لم يتم العثور على Profile ID في Buffer. يرجى إضافة BUFFER_PROFILE_ID إلى Secrets.")
-        sys.exit(1)
-
-    endpoint = "https://api.bufferapp.com/1/updates/create.json"
-    caption_text = f"{title}\n\nهل كنت تعلم هذه المعلومة من قبل؟ شاركنا رأيك في التعليقات! 👇\n\n#Shorts #shorts #معلومات #حقائق #وثائقي #استكشاف"
-
-    payload = {
-        "access_token": BUFFER_TOKEN,
-        "profile_ids[]": [profile_id],
-        "text": caption_text,
-        "now": "true",
-        "media[video]": video_url,
-        "shorten": "false"
-    }
-
+    # 1. جلب جميع القنوات المربوطة بحساب Buffer تلقائياً
     try:
-        res = requests.post(endpoint, data=payload, timeout=40)
-        res_json = res.json()
-        if res.status_code == 200 and res_json.get("success"):
-            print("🎉 تم إرسال الشورتس بنجاح إلى Buffer! جاري النشر التلقائي على القناة.")
-            return True
-        else:
-            print(f"⚠️ رد Buffer: {res.text}")
-            sys.exit(1)
+        prof_req = requests.get(f"https://api.bufferapp.com/1/profiles.json?access_token={BUFFER_TOKEN}", timeout=20)
+        if prof_req.status_code == 200:
+            profiles_data = prof_req.json()
+            if isinstance(profiles_data, list) and len(profiles_data) > 0:
+                for p in profiles_data:
+                    target_profiles.append({
+                        "id": p.get("id"),
+                        "name": p.get("formatted_username") or p.get("service_username") or "قناة غير مسماة",
+                        "service": p.get("service")
+                    })
     except Exception as e:
-        print(f"❌ فشل الاتصال بواجهة Buffer: {e}")
+        print(f"⚠️ تعذر الاستعلام التلقائي من Buffer: {e}")
+
+    # 2. في حال فشل الاستعلام، استخدام المعرفات الأساسية للقنوات الثلاث كاحتياطي
+    if not target_profiles:
+        fallback_channels = [
+            {"id": "6abace7bea19ca0bde181dff", "name": "Masar | مسار"},
+            {"id": "6abace11ea19ca0bde181821", "name": "مشاريع عملاقة | MegaBuilds"},
+        ]
+        if BUFFER_PROFILE_ID and BUFFER_PROFILE_ID not in [c["id"] for c in fallback_channels]:
+            fallback_channels.append({"id": BUFFER_PROFILE_ID, "name": "أبعاد جغرافية"})
+        target_profiles = fallback_channels
+
+    print(f"📋 سيتم النشر على {len(target_profiles)} قنوات:")
+    for tp in target_profiles:
+        print(f"  🔹 {tp['name']} (ID: {tp['id']})")
+
+    caption_text = f"{title}\n\nهل كنت تعلم هذه المعلومة من قبل؟ شاركنا رأيك في التعليقات! 👇\n\n#Shorts #shorts #معلومات #حقائق #وثائقي #استكشاف"
+    endpoint = "https://api.bufferapp.com/1/updates/create.json"
+    published_count = 0
+
+    # 3. النشر على كل قناة تباعاً
+    for tp in target_profiles:
+        pid = tp["id"]
+        pname = tp["name"]
+        print(f"\n📤 جاري النشر الآن على قناة: [{pname}]...")
+        
+        payload = {
+            "access_token": BUFFER_TOKEN,
+            "profile_ids[]": [pid],
+            "text": caption_text,
+            "now": "true",
+            "media[video]": video_url,
+            "shorten": "false"
+        }
+
+        try:
+            res = requests.post(endpoint, data=payload, timeout=40)
+            res_json = res.json()
+            if res.status_code == 200 and res_json.get("success"):
+                print(f"  🎉 تم النشر بنجاح على [{pname}]!")
+                published_count += 1
+            else:
+                print(f"  ⚠️ رد بافر للقناة [{pname}]: {res.text}")
+        except Exception as e:
+            print(f"  ❌ خطأ أثناء النشر على [{pname}]: {e}")
+        time.sleep(2)
+
+    if published_count > 0:
+        print(f"\n🏆 اكتملت المهمة بنجاح: تم نشر الشورتس على {published_count} من أصل {len(target_profiles)} قنوات!")
+        return True
+    else:
+        print("\n❌ تعذر النشر على أي قناة. تحقق من صلاحيات Buffer Token.")
         sys.exit(1)
 
 # --- نقطة البداية ---
@@ -322,7 +325,7 @@ if __name__ == "__main__":
     pub_url = get_public_video_url("final_short.mp4")
     
     if pub_url:
-        publish_to_buffer(pub_url, short_data["title"])
+        publish_to_all_buffer_channels(pub_url, short_data["title"])
     else:
         print("❌ تعذر استخراج رابط الفيديو المباشر لإرساله إلى Buffer.")
         sys.exit(1)
