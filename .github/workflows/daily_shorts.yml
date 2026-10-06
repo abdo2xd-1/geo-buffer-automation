@@ -2,17 +2,18 @@ name: Publish Daily Shorts
 
 on:
   schedule:
-    # يعمل تلقائياً كل يوم الساعة 10:00 صباحاً بتوقيت مصر (08:00 UTC)
-    - cron: '0 8 * * *'
-  workflow_dispatch: # يتيح لك إمكانية التشغيل يدوياً للتجربة في أي وقت
+    - cron: '0 11 * * *'  # تشغيل تلقائي يومي
+  workflow_dispatch:      # تشغيل يدوي
 
 jobs:
-  publish_shorts:
+  pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [MASAR, MASHAREE, ABAAD]
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -21,20 +22,22 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install System Dependencies (FFmpeg)
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg curl
 
       - name: Install Python Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --upgrade pip
+          pip install google-generativeai edge-tts gTTS requests
 
-      - name: Run Shorts Publisher
+      - name: Run Shorts Publisher (${{ matrix.channel }})
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
-          BUFFER_PROFILE_ID: ${{ secrets.BUFFER_PROFILE_ID }}
-        run: python -u main_publisher.py
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python main_publisher.py ${{ matrix.channel }}
