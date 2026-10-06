@@ -309,10 +309,10 @@ def prepare_video_footage(keywords: list, target_duration: float, output_dir: st
             
     return playlist_path
 
-# --- 6. رندر سينمائي فائق السرعة والمضبوط بالثانية بدقة ---
+# --- 6. رندر سينمائي بحبيبات الفيلم 35mm مع الضبط الزمني الدقيق ---
 def render_titan_documentary(playlist_path: str, audio_path: str, channel_name: str, output_path: str = "final_documentary.mp4"):
     doc_dur = get_audio_duration(audio_path)
-    print(f"🎨 جاري المونتاج السينمائي فائق السرعة المضبوط على {doc_dur / 60:.2f} دقيقة...")
+    print(f"🎨 جاري المونتاج السينمائي (Grading + 35mm Film Grain + Vignette) المضبوط على {doc_dur / 60:.2f} دقيقة...")
     
     bgm_cmd = [
         "ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=52:sample_rate=44100",
@@ -329,10 +329,11 @@ def render_titan_documentary(playlist_path: str, audio_path: str, channel_name: 
 
     clean_tag = clean_arabic_text(channel_name.split('|')[0].strip())
 
-    # تلوين وتظليل سينمائي سريع وخفيف بدون فلاتر ثقيلة تعطل المعالج
+    # تلوين + تظليل أطراف + فلتر حبيبات الفيلم (noise) + الشعار المائي
     video_chain = (
         "[0:v]fps=25,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,"
         "eq=contrast=1.14:saturation=1.22:brightness=-0.01,vignette=angle=0.40,"
+        "noise=alls=10:allf=t+u,"
         f"drawtext=text='{clean_tag}':fontcolor=white@0.3:fontsize=38:x=60:y=60:box=1:boxcolor=black@0.2:boxborderw=10,"
         "format=yuv420p[vout]"
     )
@@ -343,13 +344,13 @@ def render_titan_documentary(playlist_path: str, audio_path: str, channel_name: 
         "-f", "concat", "-safe", "0", "-i", playlist_path,
         "-i", audio_path,
         "-i", "long_bgm.mp3",
-        "-t", str(doc_dur),                         # إيقاف الرندر فور انتهاء الصوت بدقة
+        "-t", str(doc_dur),                         # إيقاف الرندر فور انتهاء الصوت بدقة ومنع التكرار
         "-filter_complex", f"{video_chain};{audio_chain}",
         "-map", "[vout]",
         "-map", "[aout]",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
         "-c:a", "aac", "-b:a", "192k",
-        "-threads", "0",                            # استغلال كافة قدرات المعالج
+        "-threads", "0",                            # استغلال كامل نوى المعالج
         "-max_muxing_queue_size", "1024",
         output_path
     ]
