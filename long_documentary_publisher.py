@@ -29,9 +29,12 @@ import google.generativeai as genai
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 PEXELS_KEY = os.getenv("PEXELS_API_KEY")
 
-genai.configure(api_key=GEMINI_KEY)
+if GEMINI_KEY:
+    genai.configure(api_key=GEMINI_KEY)
 
 def get_active_model():
+    if not GEMINI_KEY:
+        return None
     candidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
     for c in candidates:
         try:
@@ -41,25 +44,13 @@ def get_active_model():
             return m
         except Exception:
             continue
-    try:
-        for m_info in genai.list_models():
-            if "generateContent" in m_info.supported_generation_methods:
-                model_name = m_info.name.replace("models/", "")
-                try:
-                    m = genai.GenerativeModel(model_name)
-                    m.generate_content("test")
-                    return m
-                except Exception:
-                    continue
-    except Exception:
-        pass
-    return genai.GenerativeModel("gemini-3.8-flash")
+    return None
 
 model = get_active_model()
 VOICE_NAME = "ar-EG-ShakirNeural"
 
 MIN_DURATION_SECONDS = 600   # 10 دقائق كحد أدنى
-MAX_SAFE_SECONDS = 870       # 14.5 دقيقة كحد أقصى آمن لتجنب حظر يوتيوب
+MAX_SAFE_SECONDS = 870       # 14.5 دقيقة لتفادي قيود يوتيوب
 
 def clean_arabic_text(text: str) -> str:
     text = re.sub(r'[*#_`~>\[\]\(\)]', ' ', text)
@@ -75,6 +66,36 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
+# --- دالة الذكاء الاصطناعي المقاومة للحظر الجغرافي ---
+def query_ai_robust(prompt: str) -> str:
+    # المحاولة 1: Gemini
+    if model:
+        try:
+            res = model.generate_content(prompt)
+            if res and res.text:
+                return res.text.strip()
+        except Exception as e:
+            print(f"⚠️️ تنبيه Gemini ({e})، جاري التحويل للمحرك البديل العالمي...")
+
+    # المحاولة 2: محرك ذكاء اصطناعي بديل مفتوح وعالمي (بدون حظر جغرافي)
+    try:
+        url = "https://text.pollinations.ai/"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "messages": [
+                {"role": "system", "content": "أنت خبير كتابة وثائقيات تلفزيونية فخمة باللغة العربية الفصحى."},
+                {"role": "user", "content": prompt}
+            ],
+            "model": "openai"
+        }
+        r = requests.post(url, json=payload, headers=headers, timeout=30)
+        if r.status_code == 200 and r.text:
+            return r.text.strip()
+    except Exception:
+        pass
+
+    return ""
+
 # --- 2. توليد فكرة وفصول وثائقية كبرى (5-Act Narrative Arc) ---
 def get_titan_documentary_meta(channel_name: str) -> dict:
     print(f"🎲 جاري ابتكار ملحمة وثائقية تلفزيونية كبرى لقناة [{channel_name}]...")
@@ -82,14 +103,7 @@ def get_titan_documentary_meta(channel_name: str) -> dict:
     أنت كبير مديري إنتاج الأفلام الوثائقية العالمية في شبكة كبرى مثل National Geographic لقناة: "{channel_name}".
     ابتكر فكرة عمل وثائقي استثنائي وغامض، مع تنوع مطلق دون أي حصر مسبق (حضارات مفقودة، ألغاز جغرافية، عمليات استخباراتية، مدن تحت الأرض، كوارث غيرت العالم).
     
-    المطلوب استخراجه بدقة:
-    1. عنوان ملحمي مشوق وجذاب جداً (Clickbait أنيق).
-    2. نص مقتضب للصورة المصغرة (Headline مكوّن من 3 أو 4 كلمات نارية).
-    3. سؤال جدلي ملهم للتعليق الأول المثبت (Pinned Comment).
-    4. أسماء 4 فصول داخلية للفيلم (Chapters).
-    5. قائمة تحتوي على 12 كلمة بحث بصرية سينمائية بالإنجليزية لتغطية جميع محاور الفيلم.
-    
-    أخرج الرد بصيغة JSON حصراً:
+    المطلوب استخراجه بدقة بصيغة JSON حصراً:
     {{
         "title": "عنوان وثائقي ملحمي",
         "thumb_text": "نص الصورة المصغرة",
@@ -98,24 +112,29 @@ def get_titan_documentary_meta(channel_name: str) -> dict:
         "search_keywords": ["ancient ruins 4k", "desert mystery", "archaeology aerial", "lost civilization", "sand storm dunes", "ancient temple entrance"]
     }}
     """
-    try:
-        res = model.generate_content(prompt)
-        cleaned = res.text.strip().replace("```json", "").replace("```", "")
-        data = json.loads(cleaned)
-    except Exception:
-        topics = [
-            ("أسرار الممالك المفقودة: مدن طمستها الرمال", "الحقيقة الصادمة", "هل تعتقد أن هناك حضارات متطورة سادت قبلنا ومحيت تماماً؟", ["المقدمة واللغز", "حضارات طمستها الرمال", "اكتشافات حديثة", "السر الأعظم"], ["ancient ruins 4k", "desert mystery", "archaeology aerial", "lost civilization", "sand storm dunes", "ancient temple entrance"]),
-            ("خفايا العمليات السرية: ملفات غيرت مسار التاريخ", "ملفات محظورة", "أي هذه العمليات السرية كان لها الأثر الأكبر على عالم اليوم؟", ["مقدمة الصراع", "خلف الأبواب المغلقة", "الوثائق المسربة", "المواجهة الأخيرة"], ["classified documents", "historical warfare", "vintage intelligence", "cinematic shadows", "cold war aerial", "secret bunker door"])
-        ]
-        chosen = random.choice(topics)
-        data = {
-            "title": chosen[0],
-            "thumb_text": chosen[1],
-            "pinned_question": chosen[2],
-            "chapters": chosen[3],
-            "search_keywords": chosen[4]
-        }
-        
+    ai_raw = query_ai_robust(prompt)
+    if ai_raw:
+        try:
+            cleaned = ai_raw.replace("```json", "").replace("```", "").strip()
+            data = json.loads(cleaned)
+            print(f"  💡 العنوان المختار: {data['title']}")
+            return data
+        except Exception:
+            pass
+
+    topics = [
+        ("أسرار الممالك المفقودة: مدن طمستها الرمال", "الحقيقة الصادمة", "هل تعتقد أن هناك حضارات متطورة سادت قبلنا ومحيت تماماً؟", ["المقدمة واللغز", "حضارات طمستها الرمال", "اكتشافات حديثة", "السر الأعظم"], ["ancient ruins 4k", "desert mystery", "archaeology aerial", "lost civilization", "sand storm dunes", "ancient temple entrance"]),
+        ("خفايا العمليات السرية: ملفات غيرت مسار التاريخ", "ملفات محظورة", "أي هذه العمليات السرية كان لها الأثر الأكبر على عالم اليوم؟", ["مقدمة الصراع", "خلف الأبواب المغلقة", "الوثائق المسربة", "المواجهة الأخيرة"], ["classified documents", "historical warfare", "vintage intelligence", "cinematic shadows", "cold war aerial", "secret bunker door"]),
+        ("حدود الكوكب المجهولة: بقاع لم يطأها إنسان", "العالم الآخر", "ما هو المكان الأكثر غموضاً ورعباً على كوكب الأرض برأيك؟", ["أطراف العالم", "رحلات المستكشفين", "أسرار الطبيعة", "المصير المحتوم"], ["extreme wilderness", "mysterious mountains", "unexplored nature", "aerial drone 4k", "deep ocean abyss", "siberia frozen ice"])
+    ]
+    chosen = random.choice(topics)
+    data = {
+        "title": chosen[0],
+        "thumb_text": chosen[1],
+        "pinned_question": chosen[2],
+        "chapters": chosen[3],
+        "search_keywords": chosen[4]
+    }
     print(f"  💡 العنوان المختار: {data['title']}")
     return data
 
@@ -132,31 +151,49 @@ def generate_titan_long_script(title: str) -> str:
     - اكتب نصاً سردياً متواصلاً يتراوح بدقة بين 1500 إلى 1700 كلمة باللغة العربية الفصحى الفخمة.
     - اكتب فقط النص المقروء الذي ينطقه الراوي بصوته مباشرة دون وضع أي توجيهات إخراجية أو أسماء للمشاهد.
     """
-    script_text = ""
-    for attempt in range(3):
-        try:
-            res = model.generate_content(prompt)
-            if res.text:
-                cleaned = clean_arabic_text(res.text.strip())
-                if len(cleaned.split()) >= 900:
-                    script_text = cleaned
-                    print(f"  ✅ تم إنجاز النص السردي ({len(cleaned.split())} كلمة)!")
-                    break
-        except Exception:
-            time.sleep(4)
-            
-    if not script_text:
-        fallback = (
-            f"في عمق التاريخ وحنايا الوجود الإنساني، تقف شواهد {title} كدليل راسخ على قدرة العقل البشري على مجابهة المجهول وتجاوز الحدود التقليدية. "
-            "لقد انطلقت هذه الرحلة من فكرة بسيطة سرعان ما تحولت إلى واقع فرض نفسه على مجريات الأحداث، حيث تلاقت الإرادة مع التحديات الطبيعية والتقنية المعقدة. "
-            "تظهر السجلات والوثائق المحفوظة أن ما خفي من تفاصيل كان يفوق بكثير ما تم إعلانه في ذلك الحين، لتكشف لنا الدراسات المتأخرة أسراراً حاسمة. "
-            "إن تفحص الأرقام الدقيقة والمسارات التي سلكها الرواد يبرز بوضوح كيف تشكلت موازين جديدة أثرت على مسار الأحداث الإنسانية دون رجعة. "
-        ) * 7
-        script_text = clean_arabic_text(fallback)
-        
-    return script_text
+    ai_script = query_ai_robust(prompt)
+    if ai_script:
+        cleaned = clean_arabic_text(ai_script)
+        if len(cleaned.split()) >= 800:
+            print(f"  ✅ تم إنجاز النص السردي ({len(cleaned.split())} كلمة)!")
+            return cleaned
 
-# --- 4. توليد الصوت البشري المجزأ ---
+    # محرك التوليد الموسوعي الداخلي (Offline Procedural Engine) لضمان 1600+ كلمة
+    print("  ⚙️ تفعيل محرك التوليد الموسوعي الداخلي لضمان تخطي 11 دقيقة كاملة...")
+    part1 = (
+        f"في عمق التاريخ وأروقة الغموض الإنساني، يقف ملف {title} كأحد أعظم التحديات الفكرية والاستكشافية التي واجهت البشرية عبر العصور المتعاقبة. "
+        "إن النظر في هذا الموضوع لا يقتصر على مجرد استعراض وقائع عابرة، بل هو غوص منهجي في أسرار غير معلنة صاغت موازين القوى وشكلت منعطفات حاسمة في الوعي الجمعي للإنسانية جمعاء. "
+        "منذ اللحظات الأولى التي بدأت فيها ملامح هذه القصة بالظهور، انقسم الباحثون والمؤرخون بين مشكك في صحة الروايات المتداولة ومؤكد لوجود حقائق صادمة تم حجبها بعناية فائقة عن الرأي العام. "
+        "الوثائق المتاحة اليوم تعيد رسم المشهد بشكل غير مسبوق، كاشفة عن تقاطعات مذهلة بين الأساطير الشعبية والحقائق الجيولوجية والتاريخية الموثقة علمياً بدقة بالغة. "
+    )
+    part2 = (
+        "عند العودة إلى السجلات الأرشيفية والبيانات الميدانية المبكرة، نكتشف أن الشرارة الأولى انطلقت في ظروف استثنائية لم تحظَ بالتغطية الكافية في وسائل الإعلام التقليدية آنذاك. "
+        "شهادات المعاصرين والبيانات الاستكشافية تشير بوضوح إلى تحركات مريبة ولقاءات مغلقة سبقت الإعلان الرسمي بسنوات عديدة، بعيداً عن أعين المتطفلين والمهتمين بالتوثيق التاريخي. "
+        "تلك الحقبة شهدت صراعاً محتدماً بين رغبة جامحة في كشف الحقيقة وضغوط سياسية وأمنية هائلة فرضت طوقاً من السرية التامة لمنع تسرب أي معلومات قد تزعزع التوازن القائم وتثير جدلاً لا تحمد عقباه. "
+        "الباحثون الأوائل تركوا وراءهم مذكرات مشفرة ومخطوطات نادرة تحوي تفاصيل مذهلة عن مواقع محظورة وطرق سرية وتجارب معقدة لم يجرؤ أحد على الحديث عنها علانية. "
+    )
+    part3 = (
+        "ومع تقدم أعمال التنقيب والمسح الجيولوجي الدقيق باستخدام أحدث أجهزة الاستشعار عن بعد والأقمار الصناعية المتطورة، بدأت تتكشف ملامح غير مسبوقة لبنى تحتية معقدة وأنظمة هندسية بالغة الدقة سبقت عصرها بقرون طويلة. "
+        "العلماء عثروا على أنماط غير مفسرة وخرائط طوبوغرافية دقيقة تعود لحقب زمنية غابرة، تؤكد وجود منشآت عملاقة وتقنيات بناء فريدة تعجز النظريات الأثرية السائدة عن تقديم تفسير منطقي وشامل لكيفية إنجازها في تلك العصور البدائية. "
+        "هذه الاكتشافات وضعت المؤسسات الأكاديمية والبحثية في مأزق حقيقي، إذ أصبح من المستحيل الاستمرار في إنكار الظاهرة أو اختزالها في مجرد صدف عشوائية، مما فتح الباب على مصراعيه لفرضيات جديدة وجريئة. "
+        "التحليلات المخبرية للعينات المأخوذة أظهرت نسباً غير طبيعية لعناصر نادرة وتأثيرات حرارية وكهرومغناطيسية هائلة، مما يرجح وقوع حوادث خارقة للعادة أو استخدام تقنيات طاقة مجهولة لم نتوصل إلى فك شفرتها حتى اللحظة. "
+    )
+    part4 = (
+        "لم يكن هذا الملف مجرد لغز علمي أو تاريخي معزول، بل تحول سريعاً إلى ساحة لتنافس محموم بين قوى كبرى سعت كل منها لاحتكار أسراره واستثمارها لتحقيق تفوق استراتيجي وعسكري واقتصادي حاسم. "
+        "الأرقام والإحصائيات والتحليلات الجيوسياسية تؤكد أن الميزانيات التي رُصدت لهذه العمليات فاقت التوقعات بمراحل، مما يبرهن على الأهمية الفائقة والقيمة الهائلة التي كانت تنطوي عليها تلك الاكتشافات في حسابات صناع القرار. "
+        "الكثير من الشهود والخبراء والعلماء المستقلين الذين حاولوا التحدث علناً أو نشر أبحاثهم واجهوا تضييقاً ممنهجاً وحملات تشكيك واسعة، مما زاد من غموض المشهد وأثار تساؤلات مشروعة لا تزال تبحث عن إجابات قاطعة حتى يومنا هذا. "
+        "التنسيق الاستخباري عالي المستوى وتصنيف الملفات تحت بند سري للغاية يعكسان بوضوح مدى حساسية الموقف والخشية من العواقب غير المتوقعة في حال تم كشف كامل التفاصيل للجمهور. "
+    )
+    part5 = (
+        "في ختام هذه الرحلة الاستقصائية العميقة والشاملة، يتضح جلياً أن الحقيقة غالباً ما تكون أكثر تعقيداً وتشويقاً من كل الروايات الخيالية والأساطير التي نسجت حولها على مر الأجيال. "
+        "إن ما تم الكشف عنه حتى الآن ليس سوى قمة جبل الجليد، بينما تظل الأعماق السحيقة تخفي أسراراً مدفونة قد تغير نظرتنا للماضي البشري وتفتح آفاقاً جديدة لفهم المستقبل ومسارات التطور الإنساني. "
+        "يبقى السؤال الأهم الذي يفرض نفسه بإلحاح على الأذهان: هل ستشهد السنوات القادمة إماطة اللثام بالكامل عما تبقى من خفايا، أم أن هذا اللغز سيظل طي الكتمان مدفوناً في أعماق التاريخ إلى ما لا نهاية؟ "
+        "إن استمرار البحث والتقصي يظل واجباً معرفياً لا غنى عنه، فالوعي بالتاريخ وحقائقه الكبرى هو البوصلة الحقيقية التي ترشد الأمم نحو فهم ذاتها وبناء مستقبلها على أسس راسخة لا تزعزعها الأكاذيب والغموض. "
+    )
+    full_block = f"{part1}\n\n{part2}\n\n{part3}\n\n{part4}\n\n{part5}"
+    return f"{full_block}\n\n{full_block}\n\n{full_block}"
+
+# --- 4. توليد الصوت البشري المجزأ وضبط المدة الآمنة ---
 async def generate_chunk_edge_tts(chunk_text: str, output_file: str):
     comm = edge_tts.Communicate(chunk_text, VOICE_NAME, rate="-4%")
     await comm.save(output_file)
@@ -204,13 +241,18 @@ def build_guaranteed_audio(title: str) -> float:
     duration = get_audio_duration("narration.mp3")
     print(f"🎧 مدة الصوت الحالية: {duration / 60:.2f} دقيقة ({duration:.0f} ثانية)")
 
+    # زيادة المدة بطريقة آمنة لا تتوقف أبداً
     while duration < MIN_DURATION_SECONDS:
         extra_prompt = f"اكتب فقرة وثائقية تكميلية مطولة (350 كلمة) باللغة العربية الفصحى تضيف تحليلاً عميقاً حول: {title}."
-        extra_text = clean_arabic_text(model.generate_content(extra_prompt).text.strip())
+        extra_text = query_ai_robust(extra_prompt)
+        if not extra_text:
+            extra_text = f"إن إعادة قراءة هذه المعطيات حول {title} تسلط الضوء على أبعاد غير مرئية تتكامل مع السرد الرئيسي لتؤكد أن البحث التاريخي يظل رحلة متجددة لا تتوقف عند حدود التفسيرات الجاهزة."
+        extra_clean = clean_arabic_text(extra_text)
+
         try:
-            asyncio.run(generate_chunk_edge_tts(extra_text, "extra.mp3"))
+            asyncio.run(generate_chunk_edge_tts(extra_clean, "extra.mp3"))
         except Exception:
-            gtts.gTTS(text=extra_text, lang="ar").save("extra.mp3")
+            gtts.gTTS(text=extra_clean, lang="ar").save("extra.mp3")
             
         with open("concat_extra.txt", "w", encoding="utf-8") as f:
             f.write(f"file '{os.path.abspath('narration.mp3')}'\nfile '{os.path.abspath('extra.mp3')}'\n")
@@ -399,7 +441,7 @@ def upload_to_youtube(file_path: str, channel_key: str, meta: dict, total_durati
     try:
         thumb_path = create_auto_thumbnail(file_path, meta.get("thumb_text", "وثائقي خاص"))
         youtube.thumbnails().set(videoId=video_id, media_body=MediaFileUpload(thumb_path)).execute()
-        print(f"  🖼️ تم رفع الصورة المصغرة المخصصة (Custom Thumbnail) بنجاح!")
+        print(f"  🖼️️ تم رفع الصورة المصغرة المخصصة (Custom Thumbnail) بنجاح!")
     except Exception as e:
         print(f"  ⚠️ ملاحظة الصورة المصغرة: {e}")
 
