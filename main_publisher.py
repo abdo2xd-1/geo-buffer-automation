@@ -210,63 +210,52 @@ def render_short_video(playlist_path: str, audio_path: str, output_path: str = "
     size_mb = os.path.getsize(output_path) / (1024 * 1024)
     print(f"🎬 اكتمل إنتاج الشورتس بنجاح: {output_path} (حجم الملف: {size_mb:.1f} ميجابايت)")
 
-# --- 6. رفع الفيديو إلى خوادم موثوقة تقبل التحميل المباشر لـ Buffer ---
+# --- 6. رفع الفيديو برابط مباشر يقبله Buffer 100% بدون أي حظر أو صفحة وسيطة ---
 def get_public_video_url(file_path: str) -> str:
     size_mb = os.path.getsize(file_path) / (1024 * 1024)
     print(f"🌐 جاري رفع الفيديو بحجم {size_mb:.1f} ميجابايت للحصول على رابط مباشر لـ Buffer...")
 
-    # 1. Litterbox (خادم سريع ومباشر يقبله بافر بنسبة 100%)
+    # الطريقة 1: Catbox الرسمي عبر curl (رابط MP4 ثابت ومباشر بدون كابتشا أو حظر)
     try:
-        with open(file_path, "rb") as f:
-            files = {"fileToUpload": (os.path.basename(file_path), f, "video/mp4")}
-            data = {"reqtype": "fileupload", "time": "24h"}
-            res = requests.post("https://litterbox.catbox.moe/resources/internals/api.php", data=data, files=files, timeout=90)
-        if res.status_code == 200 and res.text.strip().startswith("http"):
-            url = res.text.strip()
-            print(f"  🔗 تم الرفع بنجاح عبر Litterbox: {url}")
+        cmd = ["curl", "-s", "-F", "reqtype=fileupload", "-F", f"fileToUpload=@{file_path}", "https://catbox.moe/user/api.php"]
+        res = subprocess.check_output(cmd, timeout=60).decode().strip()
+        if res.startswith("http") and ".mp4" in res:
+            print(f"  🔗 تم الرفع بنجاح عبر Catbox: {res}")
+            return res
+    except Exception as e:
+        print(f"⚠️ Catbox curl: {e}")
+
+    # الطريقة 2: Litterbox المؤقت عبر curl
+    try:
+        cmd = ["curl", "-s", "-F", "reqtype=fileupload", "-F", "time=24h", "-F", f"fileToUpload=@{file_path}", "https://litterbox.catbox.moe/resources/internals/api.php"]
+        res = subprocess.check_output(cmd, timeout=60).decode().strip()
+        if res.startswith("http"):
+            print(f"  🔗 تم الرفع بنجاح عبر Litterbox: {res}")
+            return res
+    except Exception as e:
+        print(f"⚠️ Litterbox curl: {e}")
+
+    # الطريقة 3: Uguu.se عبر curl
+    try:
+        cmd = ["curl", "-s", "-F", f"files[]=@{file_path}", "https://uguu.se/upload"]
+        res_raw = subprocess.check_output(cmd, timeout=60).decode().strip()
+        data = json.loads(res_raw)
+        if data.get("success") and data.get("files"):
+            url = data["files"][0].get("url")
+            print(f"  🔗 تم الرفع بنجاح عبر Uguu: {url}")
             return url
     except Exception as e:
-        print(f"⚠️ Litterbox: {e}")
+        print(f"⚠️ Uguu curl: {e}")
 
-    # 2. Catbox الرئيسي
+    # الطريقة 4: 0x0.st عبر curl
     try:
-        with open(file_path, "rb") as f:
-            files = {"fileToUpload": (os.path.basename(file_path), f, "video/mp4")}
-            data = {"reqtype": "fileupload"}
-            res = requests.post("https://catbox.moe/user/api.php", data=data, files=files, timeout=90)
-        if res.status_code == 200 and res.text.strip().startswith("http"):
-            url = res.text.strip()
-            print(f"  🔗 تم الرفع بنجاح عبر Catbox: {url}")
-            return url
+        cmd = ["curl", "-s", "-F", f"file=@{file_path}", "https://0x0.st"]
+        res = subprocess.check_output(cmd, timeout=60).decode().strip()
+        if res.startswith("http"):
+            print(f"  🔗 تم الرفع بنجاح عبر 0x0.st: {res}")
+            return res
     except Exception as e:
-        print(f"⚠️ Catbox: {e}")
-
-    # 3. Tmpfiles.org مع بادئة /dl/ للتحميل المباشر
-    try:
-        with open(file_path, "rb") as f:
-            res = requests.post(
-                "https://tmpfiles.org/api/v1/upload",
-                files={"file": (os.path.basename(file_path), f, "video/mp4")},
-                timeout=90
-            ).json()
-        raw_url = res.get("data", {}).get("url", "")
-        if raw_url:
-            direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
-            print(f"  🔗 تم الرفع بنجاح عبر Tmpfiles: {direct_url}")
-            return direct_url
-    except Exception as e:
-        print(f"⚠️ Tmpfiles: {e}")
-
-    # 4. 0x0.st
-    try:
-        with open(file_path, "rb") as f:
-            res = requests.post("https://0x0.st", files={"file": f}, timeout=90)
-        if res.status_code == 200 and res.text.strip().startswith("http"):
-            url = res.text.strip()
-            print(f"  🔗 تم الرفع بنجاح عبر 0x0.st: {url}")
-            return url
-    except Exception as e:
-        print(f"⚠️ 0x0.st: {e}")
+        print(f"⚠️ 0x0.st curl: {e}")
 
     return ""
 
@@ -313,7 +302,7 @@ def get_buffer_channels(buffer_token):
         print(f"⚠️ استعلام القنوات من GraphQL: {e}")
 
     fallback = [
-        {"id": "6abace7bea19ca0bde181dff", "name": "Masar | مسار", "service": "youtube"},
+        {"id": "6abace7bea19ca0bde181dff", "name": "مسار | Masar", "service": "youtube"},
         {"id": "6abace11ea19ca0bde181821", "name": "مشاريع عملاقة | MegaBuilds", "service": "youtube"},
         {"id": "6abacd06ea19ca0bde180ef9", "name": "أبعاد جغرافية | Abaad", "service": "youtube"}
     ]
@@ -338,6 +327,7 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
     }
     caption_text = f"{title}\n\nهل كنت تعلم هذه المعلومة من قبل؟ شاركنا رأيك في التعليقات! 👇\n\n#Shorts #shorts #معلومات #حقائق #وثائقي #استكشاف"
 
+    # Mutation GraphQL الرسمي المعتمد لـ Buffer
     mutation_query = """
     mutation CreatePost($input: CreatePostInput!) {
       createPost(input: $input) {
@@ -360,72 +350,57 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
         pname = tp.get("name")
         print(f"\n📤 جاري النشر الآن عبر GraphQL على قناة: [{pname}]...")
 
-        # جميع الحسابات هي قنوات YouTube وتتطلب title و categoryId إجبارياً مع shareNow
-        attempts_input = [
-            # محاولة 1: صيغة assets
-            {
-                "channelId": pid,
-                "text": caption_text,
-                "schedulingType": "automatic",
-                "mode": "shareNow",
-                "assets": [{"video": {"url": video_url}}],
-                "metadata": {
-                    "youtube": {
-                        "title": title[:100],
-                        "categoryId": "27",
-                        "privacy": "public",
-                        "madeForKids": False
+        # الصيغة الصحيحة المعتمدة رسمياً لقنوات يوتيوب شورتس في Buffer
+        inp_data = {
+            "channelId": pid,
+            "text": caption_text,
+            "schedulingType": "automatic",
+            "mode": "shareNow",
+            "assets": [
+                {
+                    "video": {
+                        "url": video_url
                     }
                 }
-            },
-            # محاولة 2: صيغة attachment
-            {
-                "channelId": pid,
-                "text": caption_text,
-                "schedulingType": "automatic",
-                "mode": "shareNow",
-                "attachment": {"video": {"url": video_url}},
-                "metadata": {
-                    "youtube": {
-                        "title": title[:100],
-                        "categoryId": "27",
-                        "privacy": "public",
-                        "madeForKids": False
-                    }
+            ],
+            "metadata": {
+                "youtube": {
+                    "title": title[:100],
+                    "categoryId": "27",
+                    "privacy": "public",
+                    "madeForKids": False
                 }
             }
-        ]
+        }
+
+        body = {
+            "query": mutation_query,
+            "variables": {"input": inp_data}
+        }
 
         channel_success = False
-        for att_idx, inp_data in enumerate(attempts_input, 1):
-            body = {
-                "query": mutation_query,
-                "variables": {"input": inp_data}
-            }
-            try:
-                res = requests.post(graphql_url, json=body, headers=headers, timeout=40)
-                res_data = res.json()
-                data_result = res_data.get("data", {}).get("createPost", {})
-                
-                post_info = data_result.get("post")
-                err_msg = data_result.get("message")
-                top_errors = res_data.get("errors")
+        try:
+            res = requests.post(graphql_url, json=body, headers=headers, timeout=40)
+            res_data = res.json()
+            data_result = res_data.get("data", {}).get("createPost", {})
+            
+            post_info = data_result.get("post")
+            err_msg = data_result.get("message")
+            top_errors = res_data.get("errors")
 
-                if post_info and post_info.get("id"):
-                    print(f"  🎉 تم النشر بنجاح على [{pname}]! Post ID: {post_info.get('id')}")
-                    published_count += 1
-                    channel_success = True
-                    break
-                elif err_msg:
-                    print(f"  ⚠️ رسالة بافر (محاولة {att_idx}): {err_msg}")
-                elif top_errors:
-                    print(f"  ⚠️ خطأ الاستعلام (محاولة {att_idx}): {top_errors[0].get('message')}")
-            except Exception as e:
-                print(f"  ⚠️ استثناء اتصال: {e}")
-            time.sleep(1)
+            if post_info and post_info.get("id"):
+                print(f"  🎉 تم النشر بنجاح على [{pname}]! Post ID: {post_info.get('id')}")
+                published_count += 1
+                channel_success = True
+            elif err_msg:
+                print(f"  ⚠️ رسالة بافر: {err_msg}")
+            elif top_errors:
+                print(f"  ⚠️ خطأ في الاستعلام: {top_errors[0].get('message')}")
+        except Exception as e:
+            print(f"  ⚠️ استثناء اتصال: {e}")
 
         if not channel_success:
-            print(f"  ❌ تعذر إرسال المنشور للقناة [{pname}] عبر المحاولات المتاحة.")
+            print(f"  ❌ تعذر إرسال المنشور للقناة [{pname}].")
         time.sleep(2)
 
     if published_count > 0:
