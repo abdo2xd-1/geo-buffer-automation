@@ -239,54 +239,47 @@ def get_public_video_url(file_path: str) -> str:
 
     return ""
 
-# --- 7. الاتصال والنشر عبر Buffer GraphQL API الجديد ---
+# --- 7. الاتصال والنشر عبر Buffer GraphQL API المعتمد ---
 def get_buffer_channels(buffer_token):
     headers = {
         "Authorization": f"Bearer {buffer_token}",
         "Content-Type": "application/json"
     }
-    graphql_url = "https://api.buffer.com/graphql"
-    q1 = """
-    query {
-      account {
-        organizations {
-          channels {
-            id
-            name
-            service
+    graphql_url = "https://api.buffer.com"
+    
+    try:
+        q_orgs = """
+        query {
+          account {
+            organizations {
+              id
+              name
+            }
           }
         }
-      }
-    }
-    """
-    try:
-        res = requests.post(graphql_url, json={"query": q1}, headers=headers, timeout=20).json()
+        """
+        res = requests.post(graphql_url, json={"query": q_orgs}, headers=headers, timeout=20).json()
         orgs = res.get("data", {}).get("account", {}).get("organizations", [])
         channels = []
         for org in orgs:
-            for ch in org.get("channels", []):
-                channels.append(ch)
+            org_id = org.get("id")
+            q_chan = """
+            query GetChannels($input: ChannelsInput!) {
+              channels(input: $input) {
+                id
+                name
+                service
+              }
+            }
+            """
+            c_res = requests.post(graphql_url, json={"query": q_chan, "variables": {"input": {"organizationId": org_id}}}, headers=headers, timeout=20).json()
+            ch_list = c_res.get("data", {}).get("channels", [])
+            for c in ch_list:
+                channels.append(c)
         if channels:
             return channels
     except Exception as e:
-        print(f"⚠️ استعلام القنوات 1: {e}")
-
-    q2 = """
-    query {
-      channels {
-        id
-        name
-        service
-      }
-    }
-    """
-    try:
-        res = requests.post(graphql_url, json={"query": q2}, headers=headers, timeout=20).json()
-        channels = res.get("data", {}).get("channels", [])
-        if channels:
-            return channels
-    except Exception as e:
-        print(f"⚠️️ استعلام القنوات 2: {e}")
+        print(f"⚠️ استعلام القنوات من GraphQL: {e}")
 
     fallback = [
         {"id": "6abace7bea19ca0bde181dff", "name": "Masar | مسار", "service": "youtube"},
@@ -308,20 +301,24 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
     for tp in target_profiles:
         print(f"  🔹 {tp.get('name', 'قناة')} (ID: {tp.get('id')})")
 
-    graphql_url = "https://api.buffer.com/graphql"
+    graphql_url = "https://api.buffer.com"
     headers = {
         "Authorization": f"Bearer {BUFFER_TOKEN}",
         "Content-Type": "application/json"
     }
     caption_text = f"{title}\n\nهل كنت تعلم هذه المعلومة من قبل؟ شاركنا رأيك في التعليقات! 👇\n\n#Shorts #shorts #معلومات #حقائق #وثائقي #استكشاف"
 
-    mutation_template = """
+    # الطفرة المعتمدة رسمياً في Buffer GraphQL مع Inline Fragments الصحيحة
+    mutation_query = """
     mutation CreatePost($input: CreatePostInput!) {
       createPost(input: $input) {
-        post {
-          id
+        ... on PostActionSuccess {
+          post {
+            id
+            text
+          }
         }
-        userErrors {
+        ... on MutationError {
           message
         }
       }
@@ -334,49 +331,73 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
         pname = tp.get("name")
         print(f"\n📤 جاري النشر الآن عبر GraphQL على قناة: [{pname}]...")
 
-        payload_attempts = [
+        attempts_input = [
+            # محاولة 1: نشر فوري (shareNow) مع بيانات يوتيوب
             {
                 "channelId": pid,
                 "text": caption_text,
-                "schedulingType": "now",
-                "attachment": {"video": {"url": video_url}}
+                "schedulingType": "automatic",
+                "mode": "shareNow",
+                "assets": [{"video": {"url": video_url}}],
+                "metadata": {
+                    "youtube": {
+                        "title": title[:100],
+                        "categoryId": "27",
+                        "privacy": "public",
+                        "madeForKids": False
+                    }
+                }
             },
+            # محاولة 2: إضافة لجدول القناة (addToQueue)
             {
                 "channelId": pid,
                 "text": caption_text,
-                "schedulingType": "now",
-                "assets": [{"url": video_url}]
+                "schedulingType": "automatic",
+                "mode": "addToQueue",
+                "assets": [{"video": {"url": video_url}}],
+                "metadata": {
+                    "youtube": {
+                        "title": title[:100],
+                        "categoryId": "27",
+                        "privacy": "public",
+                        "madeForKids": False
+                    }
+                }
             },
+            # محاولة 3: بدون metadata خاصة
             {
                 "channelId": pid,
                 "text": caption_text,
-                "schedulingType": "now",
-                "media": [{"url": video_url}]
+                "schedulingType": "automatic",
+                "mode": "addToQueue",
+                "assets": [{"video": {"url": video_url}}]
             }
         ]
 
         channel_success = False
-        for attempt_idx, inp in enumerate(payload_attempts, 1):
+        for att_idx, inp_data in enumerate(attempts_input, 1):
             body = {
-                "query": mutation_template,
-                "variables": {"input": inp}
+                "query": mutation_query,
+                "variables": {"input": inp_data}
             }
             try:
-                res = requests.post(graphql_url, json=body, headers=headers, timeout=30)
+                res = requests.post(graphql_url, json=body, headers=headers, timeout=35)
                 res_data = res.json()
-                print(f"  📡 استجابة Buffer GraphQL (محاولة {attempt_idx}): {res_data}")
+                data_result = res_data.get("data", {}).get("createPost", {})
+                
+                post_info = data_result.get("post")
+                err_msg = data_result.get("message")
+                top_errors = res_data.get("errors")
 
-                errors = res_data.get("errors", [])
-                user_errors = res_data.get("data", {}).get("createPost", {}).get("userErrors", [])
-                post_data = res_data.get("data", {}).get("createPost", {}).get("post")
-
-                if post_data and not user_errors and not errors:
-                    print(f"  🎉 تم النشر بنجاح على [{pname}]! Post ID: {post_data.get('id')}")
+                if post_info and post_info.get("id"):
+                    print(f"  🎉 تم النشر بنجاح على [{pname}]! Post ID: {post_info.get('id')}")
                     published_count += 1
                     channel_success = True
                     break
-                elif user_errors:
-                    print(f"  ⚠️ خطأ محتوى: {user_errors}")
+                elif err_msg:
+                    print(f"  ⚠️ رسالة بافر (محاولة {att_idx}): {err_msg}")
+                elif top_errors:
+                    print(f"  ⚠️ خطأ في الاستعلام (محاولة {att_idx}): {top_errors[0].get('message')}")
             except Exception as e:
                 print(f"  ⚠️ استثناء اتصال: {e}")
             time.sleep(1)
@@ -389,7 +410,7 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
         print(f"\n🏆 اكتملت المهمة بنجاح: تم نشر الشورتس على {published_count} قنوات!")
         return True
     else:
-        print("\n❌ فشل النشر على القنوات. يرجى مراجعة تفاصيل استجابة GraphQL أعلاه.")
+        print("\n❌ فشل النشر على القنوات. يرجى مراجعة تفاصيل الاستجابة أعلاه.")
         sys.exit(1)
 
 # --- نقطة البداية ---
