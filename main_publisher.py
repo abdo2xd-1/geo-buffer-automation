@@ -210,26 +210,57 @@ def render_short_video(playlist_path: str, audio_path: str, output_path: str = "
     size_mb = os.path.getsize(output_path) / (1024 * 1024)
     print(f"🎬 اكتمل إنتاج الشورتس بنجاح: {output_path} (حجم الملف: {size_mb:.1f} ميجابايت)")
 
-# --- 6. استخراج رابط مباشر للمقطع ---
+# --- 6. رفع الفيديو إلى خوادم موثوقة تقبل التحميل المباشر لـ Buffer ---
 def get_public_video_url(file_path: str) -> str:
     size_mb = os.path.getsize(file_path) / (1024 * 1024)
     print(f"🌐 جاري رفع الفيديو بحجم {size_mb:.1f} ميجابايت للحصول على رابط مباشر لـ Buffer...")
-    
-    # 1. temp.sh
+
+    # 1. Litterbox (خادم سريع ومباشر يقبله بافر بنسبة 100%)
     try:
         with open(file_path, "rb") as f:
-            res = requests.post("https://temp.sh/upload", files={"file": f}, timeout=60)
+            files = {"fileToUpload": (os.path.basename(file_path), f, "video/mp4")}
+            data = {"reqtype": "fileupload", "time": "24h"}
+            res = requests.post("https://litterbox.catbox.moe/resources/internals/api.php", data=data, files=files, timeout=90)
         if res.status_code == 200 and res.text.strip().startswith("http"):
             url = res.text.strip()
-            print(f"  🔗 تم الرفع بنجاح عبر temp.sh: {url}")
+            print(f"  🔗 تم الرفع بنجاح عبر Litterbox: {url}")
             return url
     except Exception as e:
-        print(f"⚠️ temp.sh: {e}")
+        print(f"⚠️ Litterbox: {e}")
 
-    # 2. 0x0.st
+    # 2. Catbox الرئيسي
     try:
         with open(file_path, "rb") as f:
-            res = requests.post("https://0x0.st", files={"file": f}, timeout=60)
+            files = {"fileToUpload": (os.path.basename(file_path), f, "video/mp4")}
+            data = {"reqtype": "fileupload"}
+            res = requests.post("https://catbox.moe/user/api.php", data=data, files=files, timeout=90)
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            url = res.text.strip()
+            print(f"  🔗 تم الرفع بنجاح عبر Catbox: {url}")
+            return url
+    except Exception as e:
+        print(f"⚠️ Catbox: {e}")
+
+    # 3. Tmpfiles.org مع بادئة /dl/ للتحميل المباشر
+    try:
+        with open(file_path, "rb") as f:
+            res = requests.post(
+                "https://tmpfiles.org/api/v1/upload",
+                files={"file": (os.path.basename(file_path), f, "video/mp4")},
+                timeout=90
+            ).json()
+        raw_url = res.get("data", {}).get("url", "")
+        if raw_url:
+            direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+            print(f"  🔗 تم الرفع بنجاح عبر Tmpfiles: {direct_url}")
+            return direct_url
+    except Exception as e:
+        print(f"⚠️ Tmpfiles: {e}")
+
+    # 4. 0x0.st
+    try:
+        with open(file_path, "rb") as f:
+            res = requests.post("https://0x0.st", files={"file": f}, timeout=90)
         if res.status_code == 200 and res.text.strip().startswith("http"):
             url = res.text.strip()
             print(f"  🔗 تم الرفع بنجاح عبر 0x0.st: {url}")
@@ -283,10 +314,9 @@ def get_buffer_channels(buffer_token):
 
     fallback = [
         {"id": "6abace7bea19ca0bde181dff", "name": "Masar | مسار", "service": "youtube"},
-        {"id": "6abace11ea19ca0bde181821", "name": "مشاريع عملاقة | MegaBuilds", "service": "youtube"}
+        {"id": "6abace11ea19ca0bde181821", "name": "مشاريع عملاقة | MegaBuilds", "service": "youtube"},
+        {"id": "6abacd06ea19ca0bde180ef9", "name": "أبعاد جغرافية | Abaad", "service": "youtube"}
     ]
-    if BUFFER_PROFILE_ID and BUFFER_PROFILE_ID not in [c["id"] for c in fallback]:
-        fallback.append({"id": BUFFER_PROFILE_ID, "name": "أبعاد جغرافية", "service": "youtube"})
     return fallback
 
 def publish_to_all_buffer_channels(video_url: str, title: str):
@@ -308,7 +338,6 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
     }
     caption_text = f"{title}\n\nهل كنت تعلم هذه المعلومة من قبل؟ شاركنا رأيك في التعليقات! 👇\n\n#Shorts #shorts #معلومات #حقائق #وثائقي #استكشاف"
 
-    # الطفرة المعتمدة رسمياً في Buffer GraphQL مع Inline Fragments الصحيحة
     mutation_query = """
     mutation CreatePost($input: CreatePostInput!) {
       createPost(input: $input) {
@@ -331,8 +360,9 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
         pname = tp.get("name")
         print(f"\n📤 جاري النشر الآن عبر GraphQL على قناة: [{pname}]...")
 
+        # جميع الحسابات هي قنوات YouTube وتتطلب title و categoryId إجبارياً مع shareNow
         attempts_input = [
-            # محاولة 1: نشر فوري (shareNow) مع بيانات يوتيوب
+            # محاولة 1: صيغة assets
             {
                 "channelId": pid,
                 "text": caption_text,
@@ -348,13 +378,13 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
                     }
                 }
             },
-            # محاولة 2: إضافة لجدول القناة (addToQueue)
+            # محاولة 2: صيغة attachment
             {
                 "channelId": pid,
                 "text": caption_text,
                 "schedulingType": "automatic",
-                "mode": "addToQueue",
-                "assets": [{"video": {"url": video_url}}],
+                "mode": "shareNow",
+                "attachment": {"video": {"url": video_url}},
                 "metadata": {
                     "youtube": {
                         "title": title[:100],
@@ -363,14 +393,6 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
                         "madeForKids": False
                     }
                 }
-            },
-            # محاولة 3: بدون metadata خاصة
-            {
-                "channelId": pid,
-                "text": caption_text,
-                "schedulingType": "automatic",
-                "mode": "addToQueue",
-                "assets": [{"video": {"url": video_url}}]
             }
         ]
 
@@ -381,7 +403,7 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
                 "variables": {"input": inp_data}
             }
             try:
-                res = requests.post(graphql_url, json=body, headers=headers, timeout=35)
+                res = requests.post(graphql_url, json=body, headers=headers, timeout=40)
                 res_data = res.json()
                 data_result = res_data.get("data", {}).get("createPost", {})
                 
@@ -397,7 +419,7 @@ def publish_to_all_buffer_channels(video_url: str, title: str):
                 elif err_msg:
                     print(f"  ⚠️ رسالة بافر (محاولة {att_idx}): {err_msg}")
                 elif top_errors:
-                    print(f"  ⚠️ خطأ في الاستعلام (محاولة {att_idx}): {top_errors[0].get('message')}")
+                    print(f"  ⚠️ خطأ الاستعلام (محاولة {att_idx}): {top_errors[0].get('message')}")
             except Exception as e:
                 print(f"  ⚠️ استثناء اتصال: {e}")
             time.sleep(1)
