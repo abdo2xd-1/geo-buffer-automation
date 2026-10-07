@@ -30,7 +30,10 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 PEXELS_KEY = os.getenv("PEXELS_API_KEY")
 
 if GEMINI_KEY:
-    genai.configure(api_key=GEMINI_KEY)
+    try:
+        genai.configure(api_key=GEMINI_KEY)
+    except Exception:
+        pass
 
 def get_active_model():
     if not GEMINI_KEY:
@@ -94,20 +97,23 @@ def query_ai_robust(prompt: str) -> str:
 
     return ""
 
-# --- 2. توليد فكرة وفصول وثائقية كبرى (5-Act Narrative Arc) ---
+# --- 2. توليد فكرة وفصول وثائقية كبرى بكلمات مفتاحية سينمائية دقيقة ---
 def get_titan_documentary_meta(channel_name: str) -> dict:
     print(f"🎲 جاري ابتكار ملحمة وثائقية تلفزيونية كبرى لقناة [{channel_name}]...")
     prompt = f"""
-    أنت كبير مديري إنتاج الأفلام الوثائقية العالمية في شبكة كبرى مثل National Geographic لقناة: "{channel_name}".
-    ابتكر فكرة عمل وثائقي استثنائي وغامض، مع تنوع مطلق دون أي حصر مسبق (حضارات مفقودة، ألغاز جغرافية، عمليات استخباراتية، مدن تحت الأرض، كوارث غيرت العالم).
+    أنت كبير مخرجي الأفلام الوثائقية العالمية (National Geographic & Netflix) لقناة: "{channel_name}".
+    ابتكر فكرة عمل وثائقي استثنائي وغامض وغير مكرر.
     
-    المطلوب استخراجه بدقة بصيغة JSON حصراً:
+    شرط أساسي للبحث البصري:
+    حدد 12 كلمة بحث سينمائية دقيقة بالإنجليزية تتطابق 100% مع سياق القصة وتمنع خروج لقطات غير مناسبة.
+    
+    المطلوب بصيغة JSON حصراً:
     {{
         "title": "عنوان وثائقي ملحمي",
         "thumb_text": "نص الصورة المصغرة",
         "pinned_question": "سؤال التعليق الأول للتفاعل",
         "chapters": ["المقدمة واللغز", "الجذور غير المعلنة", "الأدلة والتحقيق", "الخاتمة والمصير"],
-        "search_keywords": ["ancient ruins 4k", "desert mystery", "archaeology aerial", "lost civilization", "sand storm dunes", "ancient temple entrance"]
+        "search_keywords": ["keyword 1", "keyword 2", "keyword 3", "keyword 4", "keyword 5", "keyword 6", "keyword 7", "keyword 8", "keyword 9", "keyword 10", "keyword 11", "keyword 12"]
     }}
     """
     ai_raw = query_ai_robust(prompt)
@@ -121,9 +127,21 @@ def get_titan_documentary_meta(channel_name: str) -> dict:
             pass
 
     topics = [
-        ("أسرار الممالك المفقودة: مدن طمستها الرمال", "الحقيقة الصادمة", "هل تعتقد أن هناك حضارات متطورة سادت قبلنا ومحيت تماماً؟", ["المقدمة واللغز", "حضارات طمستها الرمال", "اكتشافات حديثة", "السر الأعظم"], ["ancient ruins 4k", "desert mystery", "archaeology aerial", "lost civilization", "sand storm dunes", "ancient temple entrance"]),
-        ("خفايا العمليات السرية: ملفات غيرت مسار التاريخ", "ملفات محظورة", "أي هذه العمليات السرية كان لها الأثر الأكبر على عالم اليوم؟", ["مقدمة الصراع", "خلف الأبواب المغلقة", "الوثائق المسربة", "المواجهة الأخيرة"], ["classified documents", "historical warfare", "vintage intelligence", "cinematic shadows", "cold war aerial", "secret bunker door"]),
-        ("حدود الكوكب المجهولة: بقاع لم يطأها إنسان", "العالم الآخر", "ما هو المكان الأكثر غموضاً ورعباً على كوكب الأرض برأيك؟", ["أطراف العالم", "رحلات المستكشفين", "أسرار الطبيعة", "المصير المحتوم"], ["extreme wilderness", "mysterious mountains", "unexplored nature", "aerial drone 4k", "deep ocean abyss", "siberia frozen ice"])
+        ("خفايا العمليات السرية: ملفات غيرت مسار التاريخ", "ملفات محظورة", "أي هذه العمليات السرية كان لها الأثر الأكبر على عالم اليوم؟", ["مقدمة الصراع", "خلف الأبواب المغلقة", "الوثائق المسربة", "المواجهة الأخيرة"], [
+            "classified documents vintage", "secret agent shadows", "vintage typewriter desk", "confidential archive folders",
+            "dark espionage room", "surveillance screen cctv", "old war map table", "military headquarters interior",
+            "shadowy silhouette meeting", "vintage telephone dark", "retro investigation board", "secret bunker corridor"
+        ]),
+        ("أسرار الممالك المفقودة: مدن طمستها الرمال", "الحقيقة الصادمة", "هل تعتقد أن هناك حضارات متطورة سادت قبلنا ومحيت تماماً؟", ["المقدمة واللغز", "حضارات طمستها الرمال", "اكتشافات حديثة", "السر الأعظم"], [
+            "ancient ruins aerial 4k", "petra jordan archaeology", "ancient temple entrance dark", "sand dunes excavation",
+            "egyptian tombs interior", "lost civilization relics", "historical artifact macro", "ancient parchment map",
+            "desert ruins archaeological", "stone hieroglyphs carving", "archaeologist brush artifacts", "ancient stone columns sunset"
+        ]),
+        ("معجزات الهندسة العملاقة: مشاريع تحدت المستحيل", "إعجاز بشري", "ما هو أضخم مشروع هندسي أثار دهشتك في العصر الحديث؟", ["تحدي الطبيعة", "تصاميم سابقت الزمن", "الآلات العملاقة", "مستقبل البناء"], [
+            "massive construction crane aerial", "skyscraper structural framework", "tunnel boring machine industrial", "giant concrete bridge aerial",
+            "heavy engineering machinery", "modern architectural megastructure", "workers high altitude construction", "hydroelectric dam water torrent",
+            "steel beam welding sparks", "future smart city aerial", "offshore oil rig ocean", "massive cargo container port"
+        ])
     ]
     chosen = random.choice(topics)
     data = {
@@ -264,47 +282,73 @@ def build_guaranteed_audio(title: str) -> float:
     print(f"✅ تم تأكيد مدة الفيلم الوثائقي: {duration / 60:.2f} دقيقة!")
     return duration
 
-# --- 5. جلب مشاهد Pexels المتنوعة ---
+# --- 5. جلب وتوحيد المشاهد مسبقاً لمنع تجميد الصورة (Normalization Pipeline) ---
 def prepare_video_footage(keywords: list, target_duration: float, output_dir: str = "clips") -> str:
-    print(f"🎥 جاري جلب المشاهد لتغطية مدة {target_duration / 60:.1f} دقيقة من مصادر متعددة...")
+    print(f"🎥 جاري جلب وتوحيد المشاهد مسبقاً لمنع تجميد الصورة...")
     os.makedirs(output_dir, exist_ok=True)
     headers = {"Authorization": PEXELS_KEY}
     
-    raw_clips = []
+    unique_links = []
     for kw in keywords:
-        url = f"https://api.pexels.com/videos/search?query={kw}&per_page=6&orientation=landscape"
+        url = f"https://api.pexels.com/videos/search?query={kw}&per_page=8"
         try:
             res = requests.get(url, headers=headers, timeout=20).json()
             for v in res.get("videos", []):
                 files = v.get("video_files", [])
                 chosen = next((f for f in files if f.get("width") == 1920), None) or (files[0] if files else None)
-                if chosen:
-                    raw_clips.append(chosen.get("link"))
+                if chosen and chosen.get("link") not in unique_links:
+                    unique_links.append(chosen.get("link"))
         except Exception:
             continue
             
-    unique_links = list(set(raw_clips))[:20]
-    downloaded_files = []
-    for idx, link in enumerate(unique_links, 1):
-        c_path = os.path.join(output_dir, f"clip_{idx:02d}.mp4")
+    print(f"  📥 تم استخراج {len(unique_links)} رابط فيديو عالي الدقة!")
+    
+    normalized_files = []
+    clip_counter = 0
+    total_footage_sec = 0.0
+    
+    for link in unique_links:
+        if total_footage_sec >= target_duration + 30:
+            break
+        raw_path = os.path.join(output_dir, f"raw_{clip_counter:03d}.mp4")
+        norm_path = os.path.join(output_dir, f"norm_{clip_counter:03d}.mp4")
         try:
             r = requests.get(link, stream=True, timeout=30)
-            with open(c_path, "wb") as f:
+            with open(raw_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=1024*1024):
                     f.write(chunk)
-            downloaded_files.append(c_path)
+            
+            # قص 7 ثوانٍ وتوحيد المقاس 1920x1080 وتجريد الصوت وتثبيت 25fps لمنع التجميد تماماً
+            conv_cmd = [
+                "ffmpeg", "-y", "-i", raw_path,
+                "-t", "7",
+                "-an",
+                "-vf", "fps=25,scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080:(in_w-1920)/2:(in_h-1080)/2,setsar=1,format=yuv420p",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
+                norm_path
+            ]
+            subprocess.run(conv_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            if os.path.exists(norm_path) and os.path.getsize(norm_path) > 1024:
+                dur = get_audio_duration(norm_path)
+                normalized_files.append(norm_path)
+                total_footage_sec += dur
+                clip_counter += 1
+            
+            if os.path.exists(raw_path):
+                os.remove(raw_path)
         except Exception:
             continue
             
     playlist_path = "full_playlist.txt"
     with open(playlist_path, "w", encoding="utf-8") as f:
-        loops_needed = int((target_duration // max(1, len(downloaded_files) * 8)) + 3)
-        playlist = []
+        loops_needed = max(2, int((target_duration // max(1, total_footage_sec)) + 2))
+        extended_list = []
         for _ in range(loops_needed):
-            shuffled = downloaded_files.copy()
+            shuffled = normalized_files.copy()
             random.shuffle(shuffled)
-            playlist.extend(shuffled)
-        for clip in playlist:
+            extended_list.extend(shuffled)
+        for clip in extended_list:
             f.write(f"file '{os.path.abspath(clip)}'\n")
             
     return playlist_path
@@ -331,8 +375,7 @@ def render_titan_documentary(playlist_path: str, audio_path: str, channel_name: 
 
     # تلوين + تظليل أطراف + فلتر حبيبات الفيلم (noise) + الشعار المائي
     video_chain = (
-        "[0:v]fps=25,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,"
-        "eq=contrast=1.14:saturation=1.22:brightness=-0.01,vignette=angle=0.40,"
+        "[0:v]eq=contrast=1.14:saturation=1.22:brightness=-0.01,vignette=angle=0.40,"
         "noise=alls=10:allf=t+u,"
         f"drawtext=text='{clean_tag}':fontcolor=white@0.3:fontsize=38:x=60:y=60:box=1:boxcolor=black@0.2:boxborderw=10,"
         "format=yuv420p[vout]"
@@ -340,17 +383,16 @@ def render_titan_documentary(playlist_path: str, audio_path: str, channel_name: 
 
     cmd = [
         "ffmpeg", "-y",
-        "-fflags", "+genpts",
         "-f", "concat", "-safe", "0", "-i", playlist_path,
         "-i", audio_path,
         "-i", "long_bgm.mp3",
-        "-t", str(doc_dur),                         # إيقاف الرندر فور انتهاء الصوت بدقة ومنع التكرار
+        "-t", str(doc_dur),
         "-filter_complex", f"{video_chain};{audio_chain}",
         "-map", "[vout]",
         "-map", "[aout]",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25",
         "-c:a", "aac", "-b:a", "192k",
-        "-threads", "0",                            # استغلال كامل نوى المعالج
+        "-threads", "0",
         "-max_muxing_queue_size", "1024",
         output_path
     ]
@@ -395,7 +437,7 @@ def build_seo_description(meta: dict, total_duration: float) -> str:
 # --- 9. رفع الوثائقي والصورة المصغرة والتعليق المثبت إلى يوتيوب ---
 def upload_to_youtube(file_path: str, channel_key: str, meta: dict, total_duration: float):
     title = meta["title"]
-    print(f"🚀 جاري رفع الوثائقي إلى يوتيوب [{channel_key}]: \"{title}\"...")
+    print(f'🚀 جاري رفع الوثائقي إلى يوتيوب [{channel_key}]: "{title}"...')
     
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
